@@ -89,7 +89,11 @@ export function Receipt({ payment }: Props) {
         {payment.paymentId ? (
           <div className="sm:col-span-2">
             <dt className="text-xs uppercase tracking-wide text-slate-500">
-              Base Pay payment id
+              {payment.paidVia === "wallet"
+                ? "Transaction hash"
+                : payment.paidVia === "base-pay"
+                  ? "Base Pay payment id"
+                  : "Payment id"}
             </dt>
             <dd
               className="mt-0.5 truncate font-mono text-xs text-slate-700"

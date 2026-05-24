@@ -202,6 +202,7 @@ export function PayWithBaseButton({ payment, onUpdate }: Props) {
     try {
       const updated = await getPaymentStore().update(payment.id, {
         paymentId: basePayId,
+        paidVia: "base-pay",
         status: "processing",
         submittedAt: Date.now(),
         errorMessage: undefined,

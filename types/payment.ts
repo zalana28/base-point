@@ -50,8 +50,21 @@ export interface PaymentRequest {
   /** Current lifecycle state of this request. */
   status: PaymentRequestStatus;
 
-  /** Base Pay payment id (transaction hash) returned by `pay()`. */
+  /**
+   * On-chain identifier for the payment.
+   *  - For the Base Pay path: the userOp hash returned by `pay()`.
+   *  - For the wallet path: the EVM transaction hash returned by
+   *    `writeContract(...transfer)`.
+   *
+   * `paidVia` (below) tells you which path was used.
+   */
   paymentId?: string;
+
+  /**
+   * Which payment path was used to settle this request. Set on the
+   * optimistic write that flips the record to `processing`.
+   */
+  paidVia?: "base-pay" | "wallet";
 
   /** Last error message surfaced to the customer, if any. */
   errorMessage?: string;
