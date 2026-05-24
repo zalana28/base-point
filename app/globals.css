@@ -12,12 +12,13 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/*
+ * Base Point is light-first across every route. We deliberately do NOT
+ * honour `prefers-color-scheme: dark` — the create-next-app default
+ * dark-mode override has been removed so the body, header, and page
+ * surfaces stay consistent. A real theme toggle is out of scope for the
+ * MVP; revisit if/when we need it.
+ */
 
 body {
   background: var(--background);

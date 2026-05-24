@@ -104,7 +104,12 @@ types/
 
 ```ts
 // types/payment.ts
-export type PaymentStatus =
+//
+// NOTE: We deliberately call this `PaymentRequestStatus` (not `PaymentStatus`)
+// because `@base-org/account` already exports a `PaymentStatus` type that
+// represents the on-chain status object returned by `getPaymentStatus`.
+// Our type is the lifecycle of a *local* payment request record.
+export type PaymentRequestStatus =
   | "pending"      // created, not yet paid
   | "processing"   // pay() submitted, waiting for confirmation
   | "completed"    // getPaymentStatus reported success
@@ -115,7 +120,7 @@ export interface PaymentRequest {
   recipient: `0x${string}`;
   amountUsdc: string;    // string to avoid float drift, e.g. "10.50"
   note: string;          // may be ""
-  status: PaymentStatus;
+  status: PaymentRequestStatus;
 
   // Base Pay correlation
   paymentId?: string;    // returned by pay()
@@ -138,11 +143,15 @@ export interface PaymentRequest {
 // stores/paymentStore.ts
 export interface PaymentStore {
   list(): Promise<PaymentRequest[]>;
-  get(id: string): Promise<PaymentRequest | null>;
-  create(input: Omit<PaymentRequest,
-    "id" | "status" | "createdAt" | "network" | "chainId">
+  getById(id: string): Promise<PaymentRequest | null>;
+  create(input: CreatePaymentRequestInput): Promise<PaymentRequest>;
+  update(
+    id: string,
+    patch: Partial<Omit<PaymentRequest,
+      "id" | "createdAt" | "network" | "chainId">>,
   ): Promise<PaymentRequest>;
-  update(id: string, patch: Partial<PaymentRequest>): Promise<PaymentRequest>;
+  /** Delete every record. Intended for development / reset only. */
+  clear(): Promise<void>;
 }
 
 export function getPaymentStore(): PaymentStore;
@@ -151,6 +160,10 @@ export function getPaymentStore(): PaymentStore;
 The MVP implementation (`localPaymentStore.ts`) reads and writes a single
 JSON array under the key `base-point:payments:v1`. All methods are `async`
 to keep the interface stable for a future Supabase implementation.
+
+`update` deliberately disallows mutating identity (`id`, `createdAt`) and
+network metadata (`network`, `chainId`) — those are pinned at creation
+time to prevent records from being relabelled to a different network.
 
 `getPaymentStore()` returns the local store today. When Supabase lands, it
 will read an env flag and return the appropriate adapter.
