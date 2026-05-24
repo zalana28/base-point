@@ -15,6 +15,7 @@
  *    is a drop-in replacement.
  */
 
+import { newPaymentId } from "@/lib/ids";
 import { CHAIN_ID, NETWORK_NAME } from "@/lib/network";
 import type {
   CreatePaymentRequestInput,
@@ -95,18 +96,6 @@ function writeAll(records: PaymentRequest[]): void {
   }
 }
 
-function newId(): string {
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-  ) {
-    return crypto.randomUUID();
-  }
-  // Defensive fallback for ancient runtimes. Modern browsers and Node 22
-  // (which we target) always have `crypto.randomUUID`.
-  return `pmt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 // ---------- store implementation ----------------------------------------------
 
 export const localPaymentStore: PaymentStore = {
@@ -120,7 +109,7 @@ export const localPaymentStore: PaymentStore = {
 
   async create(input: CreatePaymentRequestInput) {
     const record: PaymentRequest = {
-      id: newId(),
+      id: newPaymentId(),
       recipient: input.recipient,
       amountUsdc: input.amountUsdc,
       note: input.note,
