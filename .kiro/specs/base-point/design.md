@@ -104,7 +104,12 @@ types/
 
 ```ts
 // types/payment.ts
-export type PaymentStatus =
+//
+// NOTE: We deliberately call this `PaymentRequestStatus` (not `PaymentStatus`)
+// because `@base-org/account` already exports a `PaymentStatus` type that
+// represents the on-chain status object returned by `getPaymentStatus`.
+// Our type is the lifecycle of a *local* payment request record.
+export type PaymentRequestStatus =
   | "pending"      // created, not yet paid
   | "processing"   // pay() submitted, waiting for confirmation
   | "completed"    // getPaymentStatus reported success
@@ -115,7 +120,7 @@ export interface PaymentRequest {
   recipient: `0x${string}`;
   amountUsdc: string;    // string to avoid float drift, e.g. "10.50"
   note: string;          // may be ""
-  status: PaymentStatus;
+  status: PaymentRequestStatus;
 
   // Base Pay correlation
   paymentId?: string;    // returned by pay()
