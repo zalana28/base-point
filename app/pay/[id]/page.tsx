@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { PaymentQrCard } from "@/components/PaymentQrCard";
 import { PayWithBaseButton } from "@/components/PayWithBaseButton";
+import { PayWithWalletButton } from "@/components/PayWithWalletButton";
 import { Receipt } from "@/components/Receipt";
 import { TestnetBadge } from "@/components/TestnetBadge";
 import { getPaymentStore } from "@/stores/paymentStore";
@@ -76,11 +77,27 @@ export default function PayPage() {
           {state.phase === "loaded" ? (
             <>
               <PaymentQrCard payment={state.payment} />
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <PayWithBaseButton
                   payment={state.payment}
                   onUpdate={handlePaymentUpdate}
                 />
+                {state.payment.status !== "completed" ? (
+                  <>
+                    <div
+                      className="flex items-center gap-3 text-xs text-slate-400"
+                      aria-hidden="true"
+                    >
+                      <span className="h-px flex-1 bg-slate-200" />
+                      <span>or</span>
+                      <span className="h-px flex-1 bg-slate-200" />
+                    </div>
+                    <PayWithWalletButton
+                      payment={state.payment}
+                      onUpdate={handlePaymentUpdate}
+                    />
+                  </>
+                ) : null}
               </div>
               <Receipt payment={state.payment} />
             </>
