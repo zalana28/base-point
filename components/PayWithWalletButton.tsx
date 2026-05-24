@@ -141,8 +141,9 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
           <button
             type="button"
             onClick={() => setShowConnectors(true)}
-            className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 backdrop-blur transition-colors hover:border-white/20 hover:bg-white/10"
           >
+            <WalletIcon />
             Pay with Wallet
           </button>
           <p className="text-xs text-slate-500">
@@ -155,7 +156,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
 
     return (
       <div className="space-y-3">
-        <p className="text-xs font-medium text-slate-700">Choose a wallet:</p>
+        <p className="text-xs font-medium text-slate-300">Choose a wallet:</p>
         <div className="flex flex-wrap gap-2">
           {connectors.map((connector) => (
             <button
@@ -166,7 +167,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
                 connect({ connector });
               }}
               disabled={connecting}
-              className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-100 transition-colors hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {connector.name}
             </button>
@@ -174,13 +175,13 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
           <button
             type="button"
             onClick={() => setShowConnectors(false)}
-            className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-900"
+            className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-slate-200"
           >
             Cancel
           </button>
         </div>
         {connectError ? (
-          <p className="text-sm text-rose-600">{connectError.message}</p>
+          <p className="text-sm text-rose-300">{connectError.message}</p>
         ) : null}
         <p className="text-xs text-slate-500">
           Use Pay with Wallet for MetaMask, Rabby, Coinbase Wallet, and
@@ -196,7 +197,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
   if (chainId !== CHAIN_ID) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-slate-300">
           Your wallet is on a different network.
         </p>
         <button
@@ -206,12 +207,12 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
             switchChain({ chainId: CHAIN_ID });
           }}
           disabled={switching}
-          className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition-colors hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {switching ? "Switching\u2026" : `Switch to ${NETWORK_NAME}`}
         </button>
         {switchError ? (
-          <p className="text-sm text-rose-600">{switchError.message}</p>
+          <p className="text-sm text-rose-300">{switchError.message}</p>
         ) : null}
       </div>
     );
@@ -267,7 +268,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
       {localError ? (
         <div
           role="alert"
-          className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200"
         >
           {localError}
         </div>
@@ -278,20 +279,22 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
         onClick={handlePay}
         disabled={inFlight || processing}
         aria-busy={inFlight ? "true" : undefined}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 backdrop-blur transition-colors hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {inFlight || processing ? (
           <span
-            className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
+            className="h-3 w-3 animate-spin rounded-full border-2 border-slate-500 border-t-slate-100"
             aria-hidden="true"
           />
-        ) : null}
+        ) : (
+          <WalletIcon />
+        )}
         {label}
       </button>
 
       <p className="text-xs text-slate-500">
         Connected:{" "}
-        <span className="font-mono text-slate-700">
+        <span className="font-mono text-slate-300">
           {address ? truncateAddress(address, 6, 4) : ""}
         </span>
         {" \u00b7 "}
@@ -299,5 +302,24 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
         WalletConnect-compatible wallets.
       </p>
     </div>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <rect x="3" y="6" width="18" height="13" rx="2.5" />
+      <path d="M3 10h18" />
+      <circle cx="16.5" cy="14.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
   );
 }

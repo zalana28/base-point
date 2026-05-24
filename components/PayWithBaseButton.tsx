@@ -232,7 +232,7 @@ export function PayWithBaseButton({ payment, onUpdate }: Props) {
       {localError ? (
         <div
           role="alert"
-          className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200"
         >
           {localError}
         </div>
@@ -241,7 +241,7 @@ export function PayWithBaseButton({ payment, onUpdate }: Props) {
       {timedOut ? (
         <div
           role="status"
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-200"
         >
           Still pending. The payment may complete soon &mdash; check back
           later for the latest status.
@@ -253,15 +253,25 @@ export function PayWithBaseButton({ payment, onUpdate }: Props) {
         disabled={disabled}
         onClick={handleClick}
         aria-busy={inFlight ? "true" : undefined}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_40px_-12px_rgba(33,81,245,0.6)] transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(33,81,245,0.85)] disabled:cursor-not-allowed disabled:opacity-60 motion-safe:hover:enabled:-translate-y-0.5"
       >
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:enabled:translate-x-full motion-reduce:hidden"
+        />
+        <span
+          aria-hidden="true"
+          className="relative flex h-4 w-4 items-center justify-center rounded-sm bg-white/20 text-[10px] font-bold"
+        >
+          B
+        </span>
         {showSpinner ? (
           <span
-            className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white"
+            className="relative h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white"
             aria-hidden="true"
           />
         ) : null}
-        {label}
+        <span className="relative">{label}</span>
       </button>
 
       <p className="text-xs text-slate-500">
