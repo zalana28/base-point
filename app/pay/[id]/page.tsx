@@ -4,14 +4,11 @@
  * Base Point — `/pay/[id]`.
  *
  * Public payment page. Loads the payment-request record from the local
- * `PaymentStore` and renders the QR card and a status receipt.
- *
- * IMPORTANT: this PR (T5.1–T5.3) deliberately does NOT call Base Pay.
- * The "Pay with Base" button, the call to `startPayment`, and the
- * status-polling loop all land in the next PR (T5.4).
+ * `PaymentStore`, renders the QR card, the Pay-with-Base action, and a
+ * status receipt. The Base Pay SDK is invoked only inside
+ * `<PayWithBaseButton />`, which goes through `lib/basePay.ts`.
  *
  * Constraints honoured here:
- *  - No Base Pay calls. No `startPayment`, no `fetchPaymentStatus`.
  *  - No `@base-org/account` import (that lives in `lib/basePay.ts`).
  *  - No direct `localStorage` access (goes through `getPaymentStore()`).
  *  - No mainnet, no balance reads, no transaction-history reads, no
@@ -20,9 +17,10 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { PaymentQrCard } from "@/components/PaymentQrCard";
+import { PayWithBaseButton } from "@/components/PayWithBaseButton";
 import { Receipt } from "@/components/Receipt";
 import { TestnetBadge } from "@/components/TestnetBadge";
 import { getPaymentStore } from "@/stores/paymentStore";
@@ -56,6 +54,10 @@ export default function PayPage() {
     };
   }, [id]);
 
+  const handlePaymentUpdate = useCallback((updated: PaymentRequest) => {
+    setState({ phase: "loaded", payment: updated });
+  }, []);
+
   return (
     <div className="flex-1 bg-slate-50">
       <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:py-16">
@@ -74,10 +76,13 @@ export default function PayPage() {
           {state.phase === "loaded" ? (
             <>
               <PaymentQrCard payment={state.payment} />
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <PayWithBaseButton
+                  payment={state.payment}
+                  onUpdate={handlePaymentUpdate}
+                />
+              </div>
               <Receipt payment={state.payment} />
-              <p className="text-xs text-slate-500">
-                Base Sepolia testnet only. No mainnet payments are ever sent.
-              </p>
             </>
           ) : null}
         </div>
