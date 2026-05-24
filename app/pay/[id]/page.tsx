@@ -43,39 +43,67 @@ export default function PayPage() {
   const isSuccess =
     state.phase === "loaded" &&
     (state.payment.status === "completed" ||
+      // Defensive check for legacy / external mutations that might use
+      // the literal string "paid" as a synonym of "completed".
       (state.payment.status as string) === "paid");
 
   return (
-    <div className="flex-1 bg-gradient-to-b from-slate-50 to-slate-100/70">
-      <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:py-14">
-        <TestnetBadge />
-        <h1 className="mt-4 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-          Checkout payment
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Pay in USDC on Base Sepolia. Scan the QR code, use Base Pay, or continue with Wallet.
-        </p>
+    <div className="relative flex-1">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-0 mx-auto h-72 w-full max-w-3xl bg-[radial-gradient(closest-side,rgba(33,81,245,0.25),transparent_75%)] blur-3xl"
+      />
+
+      <div className="relative mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="flex flex-col items-start gap-4">
+          <TestnetBadge />
+          <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            Checkout
+          </h1>
+          <p className="max-w-xl text-sm text-slate-400">
+            Pay in USDC on Base Sepolia. Scan the QR with your phone, tap{" "}
+            <span className="font-medium text-slate-200">Pay with Base</span>,
+            or continue with any EVM wallet.
+          </p>
+        </div>
 
         <div className="mt-8 space-y-5">
           {state.phase === "loading" ? <LoadingSkeleton /> : null}
           {state.phase === "missing" ? <MissingState /> : null}
-          {isSuccess ? <SuccessAnimation /> : null}
+
           {state.phase === "loaded" ? (
             <>
+              {isSuccess ? <SuccessAnimation /> : null}
+
               <PaymentQrCard payment={state.payment} />
-              <div className="space-y-4 rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-sm ring-1 ring-slate-100 sm:p-6">
-                <PayWithBaseButton payment={state.payment} onUpdate={handlePaymentUpdate} />
+
+              <div className="relative space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-6">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                />
+                <PayWithBaseButton
+                  payment={state.payment}
+                  onUpdate={handlePaymentUpdate}
+                />
                 {state.payment.status !== "completed" ? (
                   <>
-                    <div className="flex items-center gap-3 text-xs text-slate-400" aria-hidden="true">
-                      <span className="h-px flex-1 bg-slate-200" />
+                    <div
+                      className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-slate-500"
+                      aria-hidden="true"
+                    >
+                      <span className="h-px flex-1 bg-white/10" />
                       <span>or</span>
-                      <span className="h-px flex-1 bg-slate-200" />
+                      <span className="h-px flex-1 bg-white/10" />
                     </div>
-                    <PayWithWalletButton payment={state.payment} onUpdate={handlePaymentUpdate} />
+                    <PayWithWalletButton
+                      payment={state.payment}
+                      onUpdate={handlePaymentUpdate}
+                    />
                   </>
                 ) : null}
               </div>
+
               <Receipt payment={state.payment} />
             </>
           ) : null}
@@ -85,5 +113,58 @@ export default function PayPage() {
   );
 }
 
-function LoadingSkeleton() { return <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">Loading…</div>; }
-function MissingState() { return <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"><h2 className="text-lg font-semibold text-slate-900">Payment not found</h2><p className="mx-auto mt-2 max-w-md text-sm text-slate-600">We couldn&apos;t find this payment request on this device.</p><Link href="/create" className="mt-5 inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800">Create a new payment</Link></div>; }
+function LoadingSkeleton() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/20 backdrop-blur">
+      <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+        <div className="h-[196px] w-[196px] animate-pulse rounded-2xl bg-white/5" />
+        <div className="flex-1 space-y-3">
+          <div className="h-3 w-24 animate-pulse rounded bg-white/10" />
+          <div className="h-10 w-40 animate-pulse rounded bg-white/10" />
+          <div className="h-3 w-48 animate-pulse rounded bg-white/10" />
+          <div className="h-3 w-36 animate-pulse rounded bg-white/10" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MissingState() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center shadow-2xl shadow-black/20 backdrop-blur">
+      <div
+        aria-hidden="true"
+        className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-6 w-6"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
+        </svg>
+      </div>
+      <h2 className="mt-4 text-lg font-semibold text-white">
+        Payment not found
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+        We couldn&apos;t find this payment request on this device. The MVP
+        stores requests per-browser; if it was created on a different device
+        you&apos;ll need to create a new one here.
+      </p>
+      <Link
+        href="/create"
+        className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_40px_-12px_rgba(33,81,245,0.6)] transition-shadow hover:shadow-[0_18px_50px_-12px_rgba(33,81,245,0.85)]"
+      >
+        Create a new payment
+      </Link>
+    </div>
+  );
+}

@@ -2,7 +2,8 @@ import { CHAIN_ID } from "@/lib/network";
 
 /**
  * Persistent visual reminder that Base Point only operates on Base
- * Sepolia testnet. Rendered in the header on every page.
+ * Sepolia testnet. Rendered in the header on every page and inline on
+ * marketing/checkout surfaces.
  *
  * Reads `CHAIN_ID` from `lib/network.ts` so the tooltip cannot drift
  * away from the value the SDK actually uses.
@@ -10,14 +11,14 @@ import { CHAIN_ID } from "@/lib/network";
 export function TestnetBadge() {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-inset ring-amber-200"
+      className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-200 backdrop-blur-sm"
       title={`Base Sepolia · chain id ${CHAIN_ID}`}
     >
-      <span
-        className="h-1.5 w-1.5 rounded-full bg-amber-500"
-        aria-hidden="true"
-      />
-      Base Sepolia · Testnet
+      <span className="relative flex h-2 w-2" aria-hidden="true">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300/60 motion-reduce:hidden" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-300" />
+      </span>
+      <span className="tracking-wide uppercase">Base Sepolia · Testnet</span>
     </span>
   );
 }

@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #04060f;
+  --foreground: #e2e8f0;
+
+  /*
+   * Base-inspired accent palette. These are referenced by Tailwind
+   * utilities below (text-[--accent-blue], etc.) and by inline gradients
+   * on the hero and CTA buttons.
+   */
+  --accent-blue: #2151f5;
+  --accent-indigo: #4f46e5;
+  --accent-cyan: #22d3ee;
+  --accent-emerald: #34d399;
 }
 
 @theme inline {
@@ -13,15 +23,59 @@
 }
 
 /*
- * Base Point is light-first across every route. We deliberately do NOT
- * honour `prefers-color-scheme: dark` — the create-next-app default
- * dark-mode override has been removed so the body, header, and page
- * surfaces stay consistent. A real theme toggle is out of scope for the
- * MVP; revisit if/when we need it.
+ * Base Point ships a dark, premium fintech look. The body is a deep
+ * slate base; pages layer their own gradient/glow on top via wrappers.
+ *
+ * We do NOT honour `prefers-color-scheme` — the visual is intentional
+ * across all OS settings.
  */
-
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/*
+ * Subtle ambient glow used by the landing hero. Kept here so the markup
+ * stays readable. `motion-reduce` short-circuits the slow drift.
+ */
+@keyframes basepoint-aurora {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(2%, -1%, 0) scale(1.05);
+    opacity: 1;
+  }
+}
+
+.bp-aurora {
+  animation: basepoint-aurora 14s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-aurora {
+    animation: none;
+  }
+}
+
+/*
+ * Form controls inherit the dark theme. Override the WebKit autofill
+ * background so the input doesn't flash to white when the browser fills
+ * a saved value.
+ */
+input:-webkit-autofill,
+textarea:-webkit-autofill {
+  -webkit-text-fill-color: #e2e8f0;
+  box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.6) inset;
+  caret-color: #e2e8f0;
+}
+
+/* Tighten default focus ring to match the dark surfaces. */
+:focus-visible {
+  outline: none;
 }

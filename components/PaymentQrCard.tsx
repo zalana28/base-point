@@ -17,8 +17,9 @@
  */
 
 import { QRCodeSVG } from "qrcode.react";
-import { useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
+import { CopyButton } from "@/components/CopyButton";
 import { formatAmount, truncateAddress } from "@/lib/format";
 import type { PaymentRequest } from "@/types/payment";
 
@@ -48,56 +49,59 @@ export function PaymentQrCard({ payment }: Props) {
     getCurrentPageUrl,
     getServerPageUrl,
   );
-  const [copied, setCopied] = useState(false);
-
-  async function onCopy() {
-    if (!pageUrl) return;
-    try {
-      await navigator.clipboard.writeText(pageUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard is best-effort. Fall back silently — the URL is also
-      // visible in the address bar.
-    }
-  }
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-sm ring-1 ring-slate-100 sm:p-6">
-      <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start sm:gap-6">
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-6">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
+      />
+
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-7">
         {/* QR ------------------------------------------------------- */}
-        <div className="shrink-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          {pageUrl ? (
-            <QRCodeSVG
-              value={pageUrl}
-              size={192}
-              level="M"
-              marginSize={0}
-              aria-label="QR code linking to this payment page"
-            />
-          ) : (
+        <div className="shrink-0">
+          <div className="relative rounded-2xl border border-white/10 bg-white p-3 shadow-lg shadow-blue-500/5">
             <div
-              className="h-48 w-48 animate-pulse rounded-sm bg-slate-100"
               aria-hidden="true"
+              className="absolute -inset-2 -z-10 rounded-3xl bg-gradient-to-br from-blue-500/20 via-cyan-300/15 to-emerald-300/10 blur-2xl"
             />
-          )}
+            {pageUrl ? (
+              <QRCodeSVG
+                value={pageUrl}
+                size={196}
+                level="M"
+                marginSize={0}
+                aria-label="QR code linking to this checkout page"
+              />
+            ) : (
+              <div
+                className="h-[196px] w-[196px] animate-pulse rounded-sm bg-slate-100"
+                aria-hidden="true"
+              />
+            )}
+          </div>
+          <p className="mt-3 max-w-[14rem] text-center text-[11px] leading-relaxed text-slate-400">
+            Scan with your phone camera to open this checkout page.
+          </p>
         </div>
 
         {/* Details -------------------------------------------------- */}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Amount
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+            Amount due
           </p>
-          <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-900">
-            {formatAmount(payment.amountUsdc)}{" "}
-            <span className="text-base font-medium text-slate-500">USDC</span>
+          <p className="mt-1.5 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+            {formatAmount(payment.amountUsdc)}
+            <span className="ml-2 align-baseline text-base font-medium text-slate-400 sm:text-lg">
+              USDC
+            </span>
           </p>
 
-          <dl className="mt-4 space-y-2 text-sm">
+          <dl className="mt-5 space-y-2.5 text-sm">
             <div className="flex items-baseline justify-between gap-3">
               <dt className="shrink-0 text-slate-500">Recipient</dt>
               <dd
-                className="truncate font-mono text-slate-900"
+                className="truncate font-mono text-slate-200"
                 title={payment.recipient}
               >
                 {truncateAddress(payment.recipient, 8, 6)}
@@ -106,27 +110,38 @@ export function PaymentQrCard({ payment }: Props) {
             {payment.note ? (
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="shrink-0 text-slate-500">Note</dt>
-                <dd className="text-right text-slate-900">{payment.note}</dd>
+                <dd className="truncate text-right text-slate-200">
+                  {payment.note}
+                </dd>
               </div>
             ) : null}
             <div className="flex items-baseline justify-between gap-3">
               <dt className="shrink-0 text-slate-500">Network</dt>
-              <dd className="text-slate-900">Base Sepolia &middot; Testnet</dd>
+              <dd className="text-slate-200">
+                Base Sepolia &middot; Testnet
+              </dd>
             </div>
           </dl>
 
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onCopy}
-              disabled={!pageUrl}
-              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {copied ? "Copied" : "Copy link"}
-            </button>
-            <span className="text-xs text-slate-500">
-              Customers can scan the QR or open this link.
-            </span>
+          <div className="mt-6 rounded-xl border border-white/10 bg-slate-950/40 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300/80">
+              How to pay
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
+              This QR opens the Base Point checkout link. After opening it,
+              choose <span className="font-medium text-white">Pay with Base</span>{" "}
+              or <span className="font-medium text-white">Pay with Wallet</span>.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {pageUrl ? (
+                <CopyButton value={pageUrl} label="Copy checkout link" />
+              ) : (
+                <CopyButton value="" label="Copy checkout link" />
+              )}
+              <span className="text-[11px] text-slate-500">
+                Or share the link directly.
+              </span>
+            </div>
           </div>
         </div>
       </div>

@@ -8,23 +8,27 @@ import type { PaymentRequestStatus } from "@/types/payment";
  */
 const STYLES: Record<
   PaymentRequestStatus,
-  { label: string; classes: string }
+  { label: string; classes: string; dot: string }
 > = {
   pending: {
     label: "Pending",
-    classes: "bg-slate-100 text-slate-800 ring-slate-200",
+    classes: "border-white/10 bg-white/5 text-slate-300",
+    dot: "bg-slate-400",
   },
   processing: {
     label: "Processing",
-    classes: "bg-blue-100 text-blue-800 ring-blue-200",
+    classes: "border-blue-400/30 bg-blue-500/10 text-blue-200",
+    dot: "bg-blue-400 animate-pulse motion-reduce:animate-none",
   },
   completed: {
     label: "Completed",
-    classes: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+    classes: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
+    dot: "bg-emerald-400",
   },
   failed: {
     label: "Failed",
-    classes: "bg-rose-100 text-rose-800 ring-rose-200",
+    classes: "border-rose-400/30 bg-rose-500/10 text-rose-200",
+    dot: "bg-rose-400",
   },
 };
 
@@ -34,11 +38,15 @@ const STYLES: Record<
  * other components must not redefine status styles.
  */
 export function StatusBadge({ status }: { status: PaymentRequestStatus }) {
-  const { label, classes } = STYLES[status];
+  const { label, classes, dot } = STYLES[status];
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${classes}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${classes}`}
     >
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${dot}`}
+      />
       {label}
     </span>
   );
