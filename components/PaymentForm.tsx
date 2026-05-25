@@ -12,8 +12,13 @@
  *    not from `/create`.
  *  - No `@base-org/account` import — that lives in `lib/basePay.ts`.
  *  - No direct `localStorage` access — go through `getPaymentStore()`.
- *  - No mainnet, no balance reads, no transaction-history reads, no
- *    block-explorer or third-party indexer.
+ *  - No balance reads, no transaction-history reads, no block-explorer
+ *    or third-party indexer.
+ *
+ * Creating a payment request is purely offchain (a write to
+ * `localStorage`); it does NOT broadcast any transaction and does NOT
+ * require gas. Customer-side payment is what consumes USDC and (for
+ * the wallet path) Base ETH for gas.
  */
 
 import { useRouter } from "next/navigation";
@@ -118,7 +123,7 @@ export function PaymentForm() {
           </p>
         ) : (
           <p id="recipient-hint" className="mt-1.5 text-xs text-slate-500">
-            USDC will be sent here on Base Sepolia.
+            USDC will be sent here on Base mainnet.
           </p>
         )}
       </div>
@@ -201,7 +206,8 @@ export function PaymentForm() {
       {/* Submit -------------------------------------------------------- */}
       <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-slate-500">
-          Base Sepolia testnet only. No mainnet payments are ever sent.
+          Live on Base mainnet. Creating this request is offchain &mdash; no
+          gas needed.
         </p>
         <button
           type="submit"

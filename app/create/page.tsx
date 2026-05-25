@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
+import { NetworkBadge } from "@/components/NetworkBadge";
 import { PaymentForm } from "@/components/PaymentForm";
-import { TestnetBadge } from "@/components/TestnetBadge";
 
 /**
  * Base Point — `/create`.
@@ -10,15 +10,19 @@ import { TestnetBadge } from "@/components/TestnetBadge";
  * `<PaymentForm />`, which is the only Client Component on this route
  * and the only thing that calls into the storage layer.
  *
+ * Creating a payment request is purely offchain (a write to
+ * `localStorage`); it does NOT broadcast a transaction and does NOT
+ * require gas. Customer-side payment is what consumes USDC and (for
+ * the wallet path) Base ETH for gas.
+ *
  * No Base Pay calls, no @base-org/account import, no localStorage,
- * no mainnet, no balance/history reads, no block-explorer or
- * third-party indexer.
+ * no balance/history reads, no block-explorer or third-party indexer.
  */
 
 export const metadata: Metadata = {
-  title: "Create payment · Base Point",
+  title: "Create payment \u00b7 Base Point",
   description:
-    "Create a USDC payment request on Base Sepolia and share the link by QR code.",
+    "Create a USDC payment request on Base mainnet and share the link by QR code. Creating the request is offchain and gasless.",
 };
 
 export default function CreatePage() {
@@ -31,7 +35,7 @@ export default function CreatePage() {
 
       <div className="relative mx-auto w-full max-w-xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="flex flex-col items-start gap-4">
-          <TestnetBadge />
+          <NetworkBadge />
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             Create payment request
           </h1>
@@ -39,6 +43,11 @@ export default function CreatePage() {
             Fill in the recipient, amount, and an optional note. We&rsquo;ll
             generate a public checkout page you can share &mdash; the QR code
             appears on the next screen.
+          </p>
+          <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2 text-xs text-slate-300">
+            Creating a payment request is offchain and gasless. The
+            customer pays in USDC on Base mainnet when they open the
+            checkout link.
           </p>
         </div>
 

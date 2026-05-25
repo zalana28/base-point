@@ -51,7 +51,7 @@ export function SuccessAnimation() {
             Payment confirmed
           </p>
           <p className="mt-0.5 text-sm text-emerald-100">
-            Funds were received on Base Sepolia.
+            Funds were received on Base.
           </p>
         </div>
       </div>

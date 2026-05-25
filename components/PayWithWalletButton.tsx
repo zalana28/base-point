@@ -5,7 +5,7 @@
  *
  * The wallet payment path: connect a regular EVM wallet (MetaMask,
  * Rabby, Coinbase Wallet, WalletConnect-compatible wallets, etc.),
- * ensure it's on Base Sepolia, and submit a USDC `transfer(...)`
+ * ensure it's on Base mainnet, and submit a USDC `transfer(...)`
  * directly. Once the transaction is mined, persist a terminal status
  * to the local PaymentStore.
  *
@@ -14,11 +14,11 @@
  * on the same page; whichever one the customer clicks "wins" and tags
  * the record via `paidVia` so the Receipt labels the id correctly.
  *
- * Failure handling (post-T6 fix):
+ * Failure handling:
  *  - Before submitting, we run `publicClient.simulateContract(...)`
  *    against the connected wallet's address. If the simulation reverts
  *    with "transfer amount exceeds balance" we surface a friendly
- *    "get testnet USDC" message and DO NOT submit anything.
+ *    "add USDC on Base" message and DO NOT submit anything.
  *  - If the transaction is submitted but the receipt comes back with
  *    `status: "reverted"`, we persist `status: "failed"` with a clear
  *    error message so the page never sticks on "Confirming…".
@@ -30,7 +30,7 @@
  *
  * Constraints honoured here (do not relax):
  *  - No `@base-org/account` import. That SDK lives in lib/basePay.ts.
- *  - No `testnet:` literal — wagmi is pinned to Base Sepolia inside
+ *  - No `testnet:` literal — wagmi is pinned to Base mainnet inside
  *    lib/wagmi.ts.
  *  - No direct `localStorage` access. Goes through `getPaymentStore()`.
  *  - No balance reads. No transaction-history reads. No block-explorer
@@ -50,9 +50,9 @@ import {
 } from "wagmi";
 
 import { truncateAddress } from "@/lib/format";
-import { CHAIN_ID, NETWORK_NAME } from "@/lib/network";
+import { CHAIN_ID, NETWORK_DISPLAY_NAME } from "@/lib/network";
 import {
-  USDC_ADDRESS_BASE_SEPOLIA,
+  USDC_ADDRESS_BASE,
   USDC_TRANSFER_ABI,
   toUsdcUnits,
 } from "@/lib/usdc";
@@ -71,7 +71,7 @@ interface Props {
 
 /** Shared revert / wait-error message, per spec. */
 const FAILURE_MESSAGE =
-  "Wallet payment failed. Your wallet may not have enough Base Sepolia USDC.";
+  "Wallet payment failed. Your wallet may not have enough USDC on Base.";
 
 /**
  * Detect "transfer amount exceeds balance" in any of the shapes viem
@@ -276,7 +276,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
           disabled={switching}
           className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition-colors hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {switching ? "Switching\u2026" : `Switch to ${NETWORK_NAME}`}
+          {switching ? "Switching\u2026" : `Switch to ${NETWORK_DISPLAY_NAME}`}
         </button>
         {switchError ? (
           <p className="text-sm text-rose-300">{switchError.message}</p>
@@ -286,7 +286,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
   }
 
   // -----------------------------------------------------------------
-  // Render: connected on Base Sepolia, ready to pay
+  // Render: connected on Base mainnet, ready to pay
   // -----------------------------------------------------------------
   const waitingForReceipt =
     submittedTxHash !== null && !receipt && !receiptError;
@@ -315,7 +315,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
       try {
         await publicClient.simulateContract({
           abi: USDC_TRANSFER_ABI,
-          address: USDC_ADDRESS_BASE_SEPOLIA,
+          address: USDC_ADDRESS_BASE,
           functionName: "transfer",
           args: [payment.recipient, toUsdcUnits(payment.amountUsdc)],
           account: address,
@@ -323,7 +323,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
       } catch (err) {
         if (isInsufficientBalanceError(err)) {
           setLocalError(
-            "Insufficient Base Sepolia USDC. Get testnet USDC and try again.",
+            "Insufficient USDC on Base. Add USDC and try again.",
           );
         } else if (
           err instanceof Error &&
@@ -344,7 +344,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
     try {
       hash = await writeContractAsync({
         abi: USDC_TRANSFER_ABI,
-        address: USDC_ADDRESS_BASE_SEPOLIA,
+        address: USDC_ADDRESS_BASE,
         functionName: "transfer",
         args: [payment.recipient, toUsdcUnits(payment.amountUsdc)],
         chainId: CHAIN_ID,
@@ -412,7 +412,8 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
           {address ? truncateAddress(address, 6, 4) : ""}
         </span>
         {" \u00b7 "}
-        Use Pay with Wallet for MetaMask, Rabby, Coinbase Wallet, and
+        Wallet payments may require Base ETH for gas. Pay with Wallet
+        works with MetaMask, Rabby, Coinbase Wallet, and
         WalletConnect-compatible wallets.
       </p>
     </div>

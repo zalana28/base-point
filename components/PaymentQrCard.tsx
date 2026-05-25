@@ -12,8 +12,8 @@
  *  - No Base Pay calls; the SDK only lives in `lib/basePay.ts`.
  *  - No `@base-org/account` import.
  *  - No direct `localStorage` access.
- *  - No mainnet, no balance reads, no transaction-history reads, no
- *    block-explorer or third-party indexer.
+ *  - No balance reads, no transaction-history reads, no block-explorer
+ *    or third-party indexer.
  */
 
 import { QRCodeSVG } from "qrcode.react";
@@ -21,6 +21,7 @@ import { useSyncExternalStore } from "react";
 
 import { CopyButton } from "@/components/CopyButton";
 import { formatAmount, truncateAddress } from "@/lib/format";
+import { NETWORK_DISPLAY_NAME } from "@/lib/network";
 import type { PaymentRequest } from "@/types/payment";
 
 interface Props {
@@ -117,9 +118,7 @@ export function PaymentQrCard({ payment }: Props) {
             ) : null}
             <div className="flex items-baseline justify-between gap-3">
               <dt className="shrink-0 text-slate-500">Network</dt>
-              <dd className="text-slate-200">
-                Base Sepolia &middot; Testnet
-              </dd>
+              <dd className="text-slate-200">{NETWORK_DISPLAY_NAME}</dd>
             </div>
           </dl>
 
