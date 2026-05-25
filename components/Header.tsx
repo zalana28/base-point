@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { TestnetBadge } from "./TestnetBadge";
+import { NetworkBadge } from "./NetworkBadge";
 
 /**
  * Top navigation rendered on every page. Pure server component — no
@@ -38,7 +38,7 @@ export function Header() {
             Dashboard
           </Link>
           <span className="ml-1 hidden sm:inline-flex">
-            <TestnetBadge />
+            <NetworkBadge />
           </span>
         </nav>
       </div>

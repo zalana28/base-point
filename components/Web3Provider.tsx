@@ -12,7 +12,7 @@
  * SDK.
  *
  * Constraints honoured here:
- *  - Base Sepolia only via `wagmiConfig` (lib/wagmi.ts).
+ *  - Base mainnet only via `wagmiConfig` (lib/wagmi.ts).
  *  - No balance reads, no transaction-history reads, no explorer or
  *    indexer APIs.
  */

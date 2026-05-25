@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { Header } from "@/components/Header";
 import { Web3Provider } from "@/components/Web3Provider";
+import { BASE_APP_ID } from "@/lib/builderCode";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,7 +19,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Base Point — USDC checkout for merchants on Base",
   description:
-    "QR-style USDC checkout for merchants on Base Sepolia. Generate a payment link, share the QR, and let customers pay with Base Pay or any EVM wallet.",
+    "QR-style USDC checkout for merchants on Base mainnet. Generate a payment link, share the QR, and let customers pay with Base Pay or any EVM wallet.",
+  /*
+   * Base Builder Code attribution. Renders as
+   *   <meta name="base:app_id" content="..." />
+   * in <head>. The id lives in lib/builderCode.ts so it is greppable
+   * from a single place; see that file for the deferred ERC-8021
+   * dataSuffix attribution plan.
+   */
+  other: {
+    "base:app_id": BASE_APP_ID,
+  },
 };
 
 export default function RootLayout({
@@ -51,8 +62,8 @@ export default function RootLayout({
             <Header />
             <main className="flex flex-1 flex-col">{children}</main>
             <footer className="border-t border-white/5 px-4 py-6 text-center text-xs text-slate-500">
-              Base Point &middot; Base Sepolia testnet only &middot; No mainnet
-              payments are ever sent
+              Base Point &middot; Live on Base mainnet &middot; Mainnet mode
+              uses real USDC
             </footer>
           </div>
         </Web3Provider>

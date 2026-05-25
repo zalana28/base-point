@@ -15,7 +15,7 @@ import type { PaymentRequest, PaymentRequestStatus } from "@/types/payment";
 const STATUS_DESCRIPTION: Record<PaymentRequestStatus, string> = {
   pending: "Waiting for the customer to pay.",
   processing: "Payment submitted. Waiting for on-chain confirmation.",
-  completed: "Payment confirmed on Base Sepolia.",
+  completed: "Payment confirmed on Base.",
   failed: "The payment did not go through. The customer can try again.",
 };
 

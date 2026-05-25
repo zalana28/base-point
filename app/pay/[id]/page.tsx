@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { NetworkBadge } from "@/components/NetworkBadge";
 import { PaymentQrCard } from "@/components/PaymentQrCard";
 import { PayWithBaseButton } from "@/components/PayWithBaseButton";
 import { PayWithWalletButton } from "@/components/PayWithWalletButton";
 import { Receipt } from "@/components/Receipt";
 import { SuccessAnimation } from "@/components/SuccessAnimation";
-import { TestnetBadge } from "@/components/TestnetBadge";
 import { getPaymentStore } from "@/stores/paymentStore";
 import type { PaymentRequest } from "@/types/payment";
 
@@ -56,15 +56,27 @@ export default function PayPage() {
 
       <div className="relative mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="flex flex-col items-start gap-4">
-          <TestnetBadge />
+          <NetworkBadge />
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             Checkout
           </h1>
           <p className="max-w-xl text-sm text-slate-400">
-            Pay in USDC on Base Sepolia. Scan the QR with your phone, tap{" "}
+            Pay in USDC on Base. Scan the QR with your phone, tap{" "}
             <span className="font-medium text-slate-200">Pay with Base</span>,
             or continue with any EVM wallet.
           </p>
+          <div
+            role="note"
+            className="flex w-full flex-col gap-1 rounded-xl border border-amber-300/30 bg-amber-300/5 px-4 py-3 text-xs text-amber-100/90 sm:text-sm"
+          >
+            <span className="font-semibold text-amber-200">
+              Mainnet mode uses real USDC.
+            </span>
+            <span className="text-amber-100/80">
+              Customers need USDC on Base. Wallet payments may require Base
+              ETH for gas. Pay with Base remains the simpler path.
+            </span>
+          </div>
         </div>
 
         <div className="mt-8 space-y-5">

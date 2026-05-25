@@ -15,25 +15,25 @@
  *    we skip it in builds without one rather than crash.
  *
  * Constraints (do not relax):
- *  - Base Sepolia ONLY. The `chains` array contains exactly one entry.
- *  - No mainnet, no balance reads, no transaction-history reads, no
- *    block-explorer or third-party indexer APIs.
+ *  - Base mainnet ONLY. The `chains` array contains exactly one entry.
+ *  - No balance reads, no transaction-history reads, no block-explorer
+ *    or third-party indexer APIs.
  *  - Does NOT import @base-org/account. The Base Pay path is fenced
  *    inside lib/basePay.ts.
  */
 
 import { http, createConfig } from "wagmi";
-import { baseSepolia } from "wagmi/chains";
+import { base } from "wagmi/chains";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 
 import { CHAIN_ID } from "./network";
 
-// Belt-and-braces: wagmi's baseSepolia chain id must match our pinned
+// Belt-and-braces: wagmi's `base` chain id must match our pinned
 // CHAIN_ID. If wagmi ever ships with a wrong chain id (or if our
 // constant drifts) this throws at module load time, which is loud.
-if (baseSepolia.id !== CHAIN_ID) {
+if (base.id !== CHAIN_ID) {
   throw new Error(
-    `Base Point: wagmi baseSepolia.id (${baseSepolia.id}) does not match CHAIN_ID (${CHAIN_ID}).`,
+    `Base Point: wagmi base.id (${base.id}) does not match CHAIN_ID (${CHAIN_ID}).`,
   );
 }
 
@@ -53,10 +53,10 @@ const connectors = [
  * doesn't try to read from `window.localStorage`.
  */
 export const wagmiConfig = createConfig({
-  chains: [baseSepolia],
+  chains: [base],
   connectors,
   transports: {
-    [baseSepolia.id]: http(),
+    [base.id]: http(),
   },
   ssr: true,
 });

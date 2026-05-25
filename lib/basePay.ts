@@ -7,13 +7,16 @@
  *
  * Why this restriction exists:
  *  - Centralises `testnet: IS_TESTNET` so it cannot drift across pages.
+ *    Both `pay()` and `getPaymentStatus()` MUST receive the same value
+ *    for the testnet flag — otherwise we would submit on mainnet but
+ *    poll on testnet (or vice versa) and the receipt would never settle.
  *  - Keeps the SDK surface a single, auditable seam if we ever upgrade
  *    or replace the payments provider.
  *  - Makes safety greps (`grep "@base-org/account"`) trivially short.
  *
- * The MVP is strictly Base Sepolia. Do not add mainnet branches, do not
- * add balance lookups, do not add transaction-history lookups, and do not
- * call any block-explorer or third-party indexer API here.
+ * The app runs on Base mainnet only. `IS_TESTNET` is `false`; both Base
+ * Pay calls pass that flag verbatim, and `assertMainnetOnly()` runs
+ * before each call to catch any accidental drift at runtime.
  */
 
 import {
@@ -24,7 +27,7 @@ import {
   type PaymentStatusType,
 } from "@base-org/account";
 
-import { IS_TESTNET, assertTestnetOnly } from "./network";
+import { IS_TESTNET, assertMainnetOnly } from "./network";
 
 // Re-export SDK types so the rest of the app never has to import from
 // `@base-org/account` directly. Renamed to make their origin obvious at
@@ -41,16 +44,16 @@ export interface StartPaymentArgs {
 }
 
 /**
- * Initiate a USDC payment on Base Sepolia via Base Pay.
+ * Initiate a USDC payment on Base mainnet via Base Pay.
  *
- * Always passes `testnet: IS_TESTNET` (which is `true` in the MVP).
+ * Always passes `testnet: IS_TESTNET` (which is `false` on mainnet).
  * Resolves with the SDK's `PaymentSuccess` shape; rejects on user-cancel
  * or transport errors — callers should surface the error message.
  */
 export async function startPayment(
   args: StartPaymentArgs,
 ): Promise<BasePayPaymentResult> {
-  assertTestnetOnly();
+  assertMainnetOnly();
   return pay({
     amount: args.amount,
     to: args.to,
@@ -61,14 +64,15 @@ export async function startPayment(
 /**
  * Poll the on-chain status of a previously initiated payment.
  *
- * The SDK returns one of: `pending` | `completed` | `failed` | `not_found`.
- * Callers translate that into our internal `PaymentRequestStatus`
- * (see `types/payment.ts`).
+ * MUST use the same `testnet:` value as `startPayment` above —
+ * otherwise the SDK would look up the payment on the wrong network.
+ * Callers translate the returned status into our internal
+ * `PaymentRequestStatus` (see `types/payment.ts`).
  */
 export async function fetchPaymentStatus(
   paymentId: string,
 ): Promise<BasePayStatus> {
-  assertTestnetOnly();
+  assertMainnetOnly();
   return getPaymentStatus({
     id: paymentId,
     testnet: IS_TESTNET,

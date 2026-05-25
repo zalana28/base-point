@@ -6,10 +6,10 @@
  * same as the Base Pay SDK's payment-status type — see `lib/basePay.ts`
  * for that.
  *
- * MVP constraints reflected here:
- *  - `network` is fixed to `"base-sepolia"`.
- *  - `chainId` is fixed to `84532`.
- *  - There is no field for mainnet, balances, or external explorer data.
+ * Base Point now runs on Base mainnet:
+ *  - `network` is fixed to `"base"`.
+ *  - `chainId` is fixed to `8453`.
+ *  - There is no field for testnet, balances, or external explorer data.
  */
 
 import type { CHAIN_ID, NETWORK_NAME } from "@/lib/network";
@@ -69,7 +69,7 @@ export interface PaymentRequest {
   /** Last error message surfaced to the customer, if any. */
   errorMessage?: string;
 
-  /** Network metadata — pinned to Base Sepolia in the MVP. */
+  /** Network metadata — pinned to Base mainnet. */
   network: typeof NETWORK_NAME;
   chainId: typeof CHAIN_ID;
 

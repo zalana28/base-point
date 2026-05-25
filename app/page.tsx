@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { TestnetBadge } from "@/components/TestnetBadge";
+import { NetworkBadge } from "@/components/NetworkBadge";
 
 /**
  * Base Point — landing page (`/`).
@@ -8,14 +8,14 @@ import { TestnetBadge } from "@/components/TestnetBadge";
  * Pure server component. Does NOT call Base Pay, does NOT touch
  * `localStorage`, and does NOT import `@base-org/account` or any
  * external indexer. Pages and components consume the network constants
- * indirectly through `<TestnetBadge />`.
+ * indirectly through `<NetworkBadge />`.
  */
 
 const STEPS: ReadonlyArray<{ n: number; title: string; body: string }> = [
   {
     n: 1,
     title: "Create a charge",
-    body: "Enter the recipient wallet, the USDC amount, and an optional note.",
+    body: "Enter the recipient wallet, the USDC amount, and an optional note. Creating the request is offchain and gasless.",
   },
   {
     n: 2,
@@ -25,7 +25,7 @@ const STEPS: ReadonlyArray<{ n: number; title: string; body: string }> = [
   {
     n: 3,
     title: "Customer pays",
-    body: "Pay with Base for one-tap checkout, or any EVM wallet on Base Sepolia.",
+    body: "Pay with Base for one-tap checkout, or any EVM wallet on Base mainnet.",
   },
   {
     n: 4,
@@ -50,8 +50,8 @@ const FEATURES: ReadonlyArray<{
     icon: "wallet",
   },
   {
-    title: "Testnet-fenced by design",
-    body: "Pinned to Base Sepolia in code. No mainnet payments are ever sent.",
+    title: "Live on Base mainnet",
+    body: "Real USDC on Base. Pinned to chain id 8453 in code, with the SDK testnet flag forced off.",
     icon: "shield",
   },
 ];
@@ -73,7 +73,7 @@ export default function HomePage() {
           <div className="flex flex-col items-start gap-6">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Built on Base · Powered by USDC
+              Built on Base &middot; Powered by USDC
             </span>
 
             <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
@@ -86,7 +86,7 @@ export default function HomePage() {
             <p className="max-w-xl text-pretty text-base leading-relaxed text-slate-400 sm:text-lg">
               Base Point is a QR-style checkout for merchants on Base. Create a
               payment request, share the QR, and let your customer pay in USDC
-              with one tap &mdash; settled on Base Sepolia in seconds.
+              with one tap &mdash; settled on Base mainnet in seconds.
             </p>
 
             <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -119,8 +119,8 @@ export default function HomePage() {
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-              <TestnetBadge />
-              <span>No mainnet payments are ever sent.</span>
+              <NetworkBadge />
+              <span>Mainnet mode uses real USDC.</span>
             </div>
           </div>
 
@@ -192,7 +192,8 @@ export default function HomePage() {
               </h3>
               <p className="mt-3 text-sm text-slate-400 sm:text-base">
                 No accounts. No SDK install. Just a wallet, an amount, and a QR
-                code your customer can scan.
+                code your customer can scan. Customers need USDC on Base; wallet
+                payments may require Base ETH for gas.
               </p>
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
@@ -286,11 +287,11 @@ function CheckoutMockup() {
 
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-6 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between text-xs">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-medium text-slate-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-            Base Sepolia
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 font-medium text-emerald-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            Base &middot; Mainnet
           </span>
-          <span className="font-mono text-slate-500">#A1F3 · Preview</span>
+          <span className="font-mono text-slate-500">#A1F3 &middot; Preview</span>
         </div>
 
         <div className="mt-6">
@@ -301,7 +302,7 @@ function CheckoutMockup() {
             24.50{" "}
             <span className="text-xl font-medium text-slate-400">USDC</span>
           </p>
-          <p className="mt-1 text-xs text-slate-500">Order #1029 · Coffee</p>
+          <p className="mt-1 text-xs text-slate-500">Order #1029 &middot; Coffee</p>
         </div>
 
         <div className="mt-6 flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4">

@@ -19,8 +19,8 @@
  *  - No raw `testnet:` literal. The testnet flag never leaves
  *    `lib/basePay.ts`.
  *  - No direct `localStorage` access. Goes through the `PaymentStore`.
- *  - No mainnet, no balance reads, no transaction-history reads, no
- *    block-explorer or third-party indexer.
+ *  - No balance reads, no transaction-history reads, no block-explorer
+ *    or third-party indexer.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -275,7 +275,8 @@ export function PayWithBaseButton({ payment, onUpdate }: Props) {
       </button>
 
       <p className="text-xs text-slate-500">
-        Base Sepolia testnet only. No mainnet payments are ever sent.
+        Mainnet mode uses real USDC. Pay with Base settles on Base in
+        seconds.
       </p>
     </div>
   );
