@@ -106,7 +106,7 @@ export default function PublicReceiptPage() {
           {state.phase === "missing" ? (
             <NotFound
               title="Receipt not found"
-              body="We couldn't find this receipt on this device. Base Point's MVP stores receipts per-browser; if it was created on a different device you'll need to view it there or create a new one here."
+              body="We couldn't find this receipt. If the merchant is running in local-only mode (no Supabase), receipt links only work on the device that created them. Ask the merchant to enable cross-device mode or create a new payment."
             />
           ) : null}
           {state.phase === "loaded" ? (
