@@ -51,11 +51,16 @@ export default function PayPage() {
     <div className="relative flex-1">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-0 mx-auto h-72 w-full max-w-3xl bg-[radial-gradient(closest-side,rgba(33,81,245,0.25),transparent_75%)] blur-3xl"
+        className="bp-no-print pointer-events-none absolute inset-x-0 top-0 -z-0 mx-auto h-72 w-full max-w-3xl bg-[radial-gradient(closest-side,rgba(33,81,245,0.25),transparent_75%)] blur-3xl"
       />
 
       <div className="relative mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="flex flex-col items-start gap-4">
+        {/*
+          Heading + warning callout: screen-only. When the merchant
+          prints from this page, none of these surrounding elements
+          should land on paper — only the receipt below.
+        */}
+        <div className="bp-no-print flex flex-col items-start gap-4">
           <NetworkBadge />
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             Checkout
@@ -80,16 +85,30 @@ export default function PayPage() {
         </div>
 
         <div className="mt-8 space-y-5">
-          {state.phase === "loading" ? <LoadingSkeleton /> : null}
-          {state.phase === "missing" ? <MissingState /> : null}
+          {state.phase === "loading" ? (
+            <div className="bp-no-print">
+              <LoadingSkeleton />
+            </div>
+          ) : null}
+          {state.phase === "missing" ? (
+            <div className="bp-no-print">
+              <MissingState />
+            </div>
+          ) : null}
 
           {state.phase === "loaded" ? (
             <>
-              {isSuccess ? <SuccessAnimation /> : null}
+              {isSuccess ? (
+                <div className="bp-no-print">
+                  <SuccessAnimation />
+                </div>
+              ) : null}
 
-              <PaymentQrCard payment={state.payment} />
+              <div className="bp-no-print">
+                <PaymentQrCard payment={state.payment} />
+              </div>
 
-              <div className="relative space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-6">
+              <div className="bp-no-print relative space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-6">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
@@ -117,6 +136,30 @@ export default function PayPage() {
               </div>
 
               <Receipt payment={state.payment} />
+
+              {state.payment.receiptId ? (
+                <div className="bp-no-print flex justify-end">
+                  <Link
+                    href={`/receipt/${state.payment.receiptId}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-cyan-300 transition-colors hover:text-white"
+                  >
+                    View public receipt
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m13 6 6 6-6 6" />
+                    </svg>
+                  </Link>
+                </div>
+              ) : null}
             </>
           ) : null}
         </div>

@@ -81,14 +81,42 @@ textarea:-webkit-autofill {
 }
 
 /*
- * Print styles.
+ * Print styles — modern POS receipt.
  *
- * Receipts printed from /pay/[id] or /receipt/[id] should look like a
- * clean, monochrome paper receipt: dark theme is for the screen, paper
- * gets black ink on white. Anything tagged `bp-no-print` is hidden;
- * the receipt container (`bp-receipt-print`) is forced to a flat,
- * border-only treatment that translates well to inked paper.
+ * Goal: when a customer or merchant clicks "Print receipt" on
+ * /pay/[id] or /receipt/[id], the print preview should show ONLY the
+ * receipt (no app chrome, no QR card, no pay buttons, no glows),
+ * styled as a clean black-on-white receipt that fits one A4 page.
+ *
+ * Mechanism — three opt-in classes co-operate:
+ *
+ *   .bp-no-print       Hidden on print. Used for navigation, footers,
+ *                      checkout cards, action rows, decorative glows,
+ *                      anything that isn't part of the receipt.
+ *   .bp-screen-only    Hidden on print. Used inside the receipt for
+ *                      the rich dark-theme blocks that don't translate
+ *                      well to ink (gradients, glass, status accents).
+ *   .bp-print-only     Hidden on screen, visible on print. Used inside
+ *                      the receipt for the compact black-and-white
+ *                      header / table / meta list / footer that we
+ *                      want on paper.
+ *
+ * Hiding `.bp-print-only` on screen is scoped under `@media screen` so
+ * Tailwind utility classes (`grid`, `flex`, etc.) on the same element
+ * still take effect on print without specificity battles.
  */
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media screen {
+  .bp-print-only {
+    display: none !important;
+  }
+}
+
 @media print {
   html,
   body {
@@ -96,30 +124,60 @@ textarea:-webkit-autofill {
     color: #0f172a !important;
   }
 
-  /* Hide app chrome (header, footer, action rows, page glows). */
+  /* Hide app chrome and explicit screen-only blocks. */
   header,
   footer,
   .bp-no-print,
+  .bp-screen-only,
   .bp-aurora,
   [data-no-print] {
     display: none !important;
   }
 
-  /* Force flat colours / no shadows on the receipt itself. */
+  /* Make sure ancestors never collapse the receipt off-screen. */
+  main {
+    display: block !important;
+    padding: 0 !important;
+  }
+
+  /*
+   * Receipt visual treatment for print: clean white POS receipt.
+   * Compact spacing, single-pixel border, no shadows or gradients.
+   */
   .bp-receipt-print {
     background: #ffffff !important;
     color: #0f172a !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
+    padding: 14px !important;
+    margin: 0 !important;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
+
+  /*
+   * Receipt descendants: strip everything that wouldn't print well —
+   * gradients, dark fills, blurs, drop shadows. Keep typography,
+   * spacing, and structural borders.
+   */
   .bp-receipt-print *,
   .bp-receipt-print *::before,
   .bp-receipt-print *::after {
     color: inherit !important;
     background: transparent !important;
-    border-color: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Avoid splitting the key sections across page breaks. */
+  .bp-receipt-print > * {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
