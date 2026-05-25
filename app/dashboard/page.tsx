@@ -26,6 +26,7 @@ import {
   canRecoverPayment,
   recoverPaymentStatus,
 } from "@/lib/paymentRecovery";
+import { isSupabaseEnabled } from "@/lib/supabaseClient";
 import { getPaymentStore } from "@/stores/paymentStore";
 import type { PaymentRequest, PaymentRequestStatus } from "@/types/payment";
 
@@ -229,6 +230,30 @@ export default function DashboardPage() {
           Wallet transfers move funds. Base Point gives merchants checkout
           links, receipts, and a payment record.
         </p>
+
+        {/* Local-mode warning */}
+        {!isSupabaseEnabled && (
+          <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3">
+            <p className="text-sm font-medium text-amber-200">
+              Local mode: payment requests are stored only in this browser.
+            </p>
+            <p className="mt-1 text-xs text-amber-100/70">
+              QR links will not work across devices. Set{" "}
+              <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-[11px]">
+                NEXT_PUBLIC_SUPABASE_URL
+              </code>{" "}
+              and{" "}
+              <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-[11px]">
+                NEXT_PUBLIC_SUPABASE_ANON_KEY
+              </code>{" "}
+              in your{" "}
+              <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-[11px]">
+                .env.local
+              </code>{" "}
+              to enable cross-device checkout.
+            </p>
+          </div>
+        )}
 
         {/* Stats */}
         {stats && (

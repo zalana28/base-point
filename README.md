@@ -224,9 +224,15 @@ cp .env.example .env.local
 | Variable                              | Required | Purpose                                                                                                          |
 | ------------------------------------- | :------: | ---------------------------------------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | No       | Enables the WalletConnect connector for mobile wallets (Rainbow, Trust, etc.). Get one from [Reown Cloud](https://cloud.reown.com/). If unset, the connector is simply omitted at build time and the injected / Coinbase Wallet connectors still work. |
+| `NEXT_PUBLIC_SUPABASE_URL`            | No       | Supabase project URL. Enables cross-device checkout (QR links work from any device). Without this, payments are stored in localStorage only. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`       | No       | Supabase anonymous key. Required together with the URL above.                                                     |
 
 There are **no required** environment variables. The Base Pay path and the
 injected-wallet / Coinbase Wallet paths run with zero configuration.
+
+When both Supabase variables are set, payment requests are persisted remotely
+so QR checkout links work cross-device. Without them, Base Point runs in
+**localStorage-only mode** (suitable for demos on a single device).
 
 > No keys for Etherscan, Basescan, Alchemy, Infura, Moralis, or Covalent are
 > needed &mdash; or accepted. Base Point does not call any third-party
@@ -262,6 +268,81 @@ npm run start   # Serve the production build
 
 ---
 
+## Cross-device checkout (Supabase setup)
+
+By default Base Point stores payments in `localStorage` (single-device demo
+mode). To enable **cross-device checkout** — where a QR scanned on the
+customer&rsquo;s phone loads the payment created on the merchant&rsquo;s
+desktop — set up Supabase:
+
+### 1. Create a Supabase project
+
+Go to [supabase.com/dashboard](https://supabase.com/dashboard) and create a
+free project.
+
+### 2. Run the SQL migration
+
+Open the **SQL Editor** in your Supabase project and run:
+
+```sql
+create table payment_requests (
+  id text primary key,
+  receipt_id text unique,
+  recipient text not null,
+  amount_usdc text not null,
+  note text not null default '',
+  status text not null default 'pending',
+  payment_id text,
+  paid_via text,
+  error_message text,
+  network text not null default 'base',
+  chain_id integer not null default 8453,
+  created_at text not null,
+  submitted_at text,
+  settled_at text,
+  merchant_name text,
+  item_name text,
+  quantity integer,
+  unit_price_usdc text,
+  customer_label text,
+  receipt_url text
+);
+
+-- No auth in the MVP, so allow all access via the anon key.
+-- Tighten these policies when you add merchant authentication.
+alter table payment_requests enable row level security;
+create policy "Allow all access" on payment_requests
+  for all using (true) with check (true);
+```
+
+### 3. Configure environment variables
+
+Copy your project URL and anon key from **Settings &rarr; API** and add them
+to `.env.local`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
+```
+
+### 4. Restart the dev server
+
+```bash
+npm run dev
+```
+
+The dashboard will no longer show the &ldquo;Local mode&rdquo; warning, and
+checkout QR links will work from any device.
+
+### Storage modes at a glance
+
+| Mode            | Env vars          | QR cross-device | Dashboard scope |
+| --------------- | ----------------- | :-------------: | --------------- |
+| localStorage    | Not set           | No              | Per-browser     |
+| Supabase hybrid | Both vars set     | Yes             | Per-project     |
+
+---
+
 ## Safety constraints
 
 Base Point treats safety as a code-level invariant, not a code review TODO.
@@ -278,8 +359,8 @@ greppable seams:
 | **No balance reads.**                                                  | The `transfer`-only ABI in `lib/usdc.ts` has no `balanceOf`. No `useBalance`, `useReadContract`, or `getBalance` callsites exist. |
 | **No transaction-history reads.**                                      | No `getLogs`, `watchEvent`, `useWatchContractEvent`, or any third-party indexer call.                              |
 | **No block explorer / indexer APIs.**                                  | No code references Etherscan, Basescan, Alchemy, Infura, Moralis, or Covalent.                                    |
-| **No Supabase yet.**                                                   | The `PaymentStore` interface is async on purpose so a Supabase adapter can drop in later, but no Supabase code ships today. |
-| **No auth yet.**                                                       | There is no merchant sign-in. The dashboard is per-browser via `localStorage`.                                    |
+| **No Supabase yet.**                                                   | The `PaymentStore` interface supports an optional Supabase adapter (`stores/supabasePaymentStore.ts`). When env vars are set, the hybrid store writes to Supabase for cross-device checkout; when absent, localStorage-only mode is used. No auth is required. |
+| **No auth yet.**                                                       | There is no merchant sign-in. The dashboard is per-browser via `localStorage` (or per-project via Supabase if configured).                                    |
 
 ---
 
@@ -287,10 +368,11 @@ greppable seams:
 
 These are known and intentional today:
 
-- **Per-browser storage.** Payment requests live in `localStorage`, so a
-  request created in one browser is invisible to another. Sharing only the
-  checkout link works for paying, but the merchant&rsquo;s dashboard view
-  is local until a backend lands.
+- **Per-browser storage (without Supabase).** When Supabase is not
+  configured, payment requests live in `localStorage`, so a request created
+  in one browser is invisible to another. With Supabase configured, QR
+  checkout links work cross-device. The dashboard shows a warning in
+  local-only mode.
 - **Polling, not webhooks.** Base Pay status is polled every 2 seconds for
   up to 90 seconds; after that, the UI surfaces a *still pending* hint and
   the user can refresh later. There is no server-side confirmation
@@ -313,8 +395,9 @@ These are known and intentional today:
 
 Loose, in priority order. Nothing here is committed to a date.
 
-- **Supabase adapter for `PaymentStore`** so payment requests survive across
-  devices and merchants.
+- **Supabase adapter for `PaymentStore`** ~~so payment requests survive
+  across devices and merchants~~ ✅ Shipped. Set `NEXT_PUBLIC_SUPABASE_URL`
+  and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
 - **Sign in with Base** for merchant authentication, scoping the dashboard
   per-merchant rather than per-browser.
 - **Server-side confirmation webhook** so receipts stay accurate even when

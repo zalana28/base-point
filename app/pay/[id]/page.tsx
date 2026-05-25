@@ -272,9 +272,10 @@ function MissingState() {
         Payment not found
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-        We couldn&apos;t find this payment request on this device. The MVP
-        stores requests per-browser; if it was created on a different device
-        you&apos;ll need to create a new one here.
+        We couldn&apos;t find this payment request. If the merchant is
+        running in local-only mode (no Supabase), checkout links only work
+        on the device that created them. Ask the merchant to enable
+        cross-device mode or create a new payment.
       </p>
       <Link
         href="/create"
