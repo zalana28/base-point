@@ -4,11 +4,15 @@
  * Base Point — public receipt page (`/receipt/[id]`).
  *
  * Loads a payment by its human-readable `receiptId` (slug `[id]`) and
- * renders the shared `<Receipt />` component plus a "pay this receipt"
- * link when the request has not yet settled. Designed to also look
- * good when printed — the print stylesheet in `app/globals.css`
- * hides the surrounding nav/footer/badge so only the receipt card
- * lands on paper.
+ * renders the shared `<Receipt />` component plus a small action bar
+ * with Back / Copy / Print buttons. Designed to also look good when
+ * printed — the print stylesheet in `app/globals.css` hides the
+ * surrounding nav/footer/badge/action-bar so only the receipt card
+ * lands on paper, and forces a clean black-on-white treatment.
+ *
+ * `<Receipt />` is rendered with `hideShareRow` so the duplicate
+ * inline share/print row inside the receipt does not compete with
+ * the canonical action bar at the top of this page.
  *
  * Constraints honoured here (do not relax):
  *  - No Base Pay calls. No `@base-org/account` import.
@@ -19,9 +23,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { CopyButton } from "@/components/CopyButton";
 import { NetworkBadge } from "@/components/NetworkBadge";
+import { PrintButton } from "@/components/PrintButton";
 import { Receipt } from "@/components/Receipt";
 import { isReceiptIdLike } from "@/lib/receipt";
 import { getPaymentStore } from "@/stores/paymentStore";
@@ -32,6 +38,11 @@ type LoadState =
   | { phase: "missing" }
   | { phase: "invalid" }
   | { phase: "loaded"; payment: PaymentRequest };
+
+const SUBSCRIBE_NOOP = () => () => {};
+const getOrigin = (): string | null =>
+  typeof window === "undefined" ? null : window.location.origin;
+const getServerOrigin = (): string | null => null;
 
 export default function PublicReceiptPage() {
   const params = useParams<{ id: string }>();
@@ -79,8 +90,8 @@ export default function PublicReceiptPage() {
             Receipt
           </h1>
           <p className="max-w-xl text-sm text-slate-400">
-            Public receipt for a Base Point payment request. Print or copy the
-            link to share with the customer.
+            Public receipt for a Base Point payment request. Print or copy
+            the link to share with the customer.
           </p>
         </div>
 
@@ -100,7 +111,9 @@ export default function PublicReceiptPage() {
           ) : null}
           {state.phase === "loaded" ? (
             <>
-              <Receipt payment={state.payment} />
+              <ReceiptActions payment={state.payment} />
+
+              <Receipt payment={state.payment} hideShareRow />
 
               {state.payment.status !== "completed" ? (
                 <div className="bp-no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 backdrop-blur">
@@ -118,6 +131,55 @@ export default function PublicReceiptPage() {
             </>
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Action bar shown above the receipt card on screen, hidden on print.
+ *
+ * Layout: a [Back to checkout] link on the left, [Copy receipt link]
+ * + [Print receipt] buttons on the right. The receipt URL is computed
+ * from the current origin via `useSyncExternalStore` so the SSR render
+ * sees `null` and the client render sees the real URL — no hydration
+ * mismatch.
+ */
+function ReceiptActions({ payment }: { payment: PaymentRequest }) {
+  const origin = useSyncExternalStore(
+    SUBSCRIBE_NOOP,
+    getOrigin,
+    getServerOrigin,
+  );
+  const url =
+    origin && payment.receiptId
+      ? `${origin}/receipt/${payment.receiptId}`
+      : "";
+
+  return (
+    <div className="bp-no-print bp-receipt-print-actions flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 backdrop-blur">
+      <Link
+        href={`/pay/${payment.id}`}
+        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-slate-300 transition-colors hover:text-white"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+          aria-hidden="true"
+        >
+          <path d="M19 12H5" />
+          <path d="m11 18-6-6 6-6" />
+        </svg>
+        Back to checkout
+      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <CopyButton value={url} label="Copy receipt link" />
+        <PrintButton />
       </div>
     </div>
   );
