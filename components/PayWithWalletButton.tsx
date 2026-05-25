@@ -14,11 +14,29 @@
  * on the same page; whichever one the customer clicks "wins" and tags
  * the record via `paidVia` so the Receipt labels the id correctly.
  *
+ * Builder Code attribution
+ * ------------------------
+ * The ERC-8021 Builder Code suffix is appended to wallet transaction
+ * calldata for Base attribution. Concretely:
+ *   1. We `encodeFunctionData` for `transfer(recipient, amount)` to get
+ *      the canonical 4-byte selector + abi-encoded args.
+ *   2. `appendBuilderCodeSuffix(...)` tacks the ERC-8021 suffix on the
+ *      end. USDC's `transfer` ignores trailing bytes per the ABI, so
+ *      semantics are unchanged.
+ *   3. We submit via `useSendTransaction` so wagmi sends our exact
+ *      `data` field — `useWriteContract` would re-encode and strip
+ *      the suffix.
+ * The Base Pay path is intentionally NOT changed: we only attach the
+ * suffix where we control the raw calldata.
+ *
  * Failure handling:
  *  - Before submitting, we run `publicClient.simulateContract(...)`
  *    against the connected wallet's address. If the simulation reverts
  *    with "transfer amount exceeds balance" we surface a friendly
- *    "add USDC on Base" message and DO NOT submit anything.
+ *    "add USDC on Base" message and DO NOT submit anything. We
+ *    deliberately simulate the clean `transfer(...)` call (without the
+ *    suffix); the suffix bytes are ignored by USDC, so the simulation
+ *    outcome is the same and we keep the wagmi-typed simulator path.
  *  - If the transaction is submitted but the receipt comes back with
  *    `status: "reverted"`, we persist `status: "failed"` with a clear
  *    error message so the page never sticks on "Confirming…".
@@ -40,15 +58,17 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { encodeFunctionData } from "viem";
 import {
   useAccount,
   useConnect,
   usePublicClient,
+  useSendTransaction,
   useSwitchChain,
   useWaitForTransactionReceipt,
-  useWriteContract,
 } from "wagmi";
 
+import { appendBuilderCodeSuffix } from "@/lib/builderCode";
 import { truncateAddress } from "@/lib/format";
 import { CHAIN_ID, NETWORK_DISPLAY_NAME } from "@/lib/network";
 import {
@@ -127,7 +147,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
     isPending: switching,
     error: switchError,
   } = useSwitchChain();
-  const { writeContractAsync, isPending: submitting } = useWriteContract();
+  const { sendTransactionAsync, isPending: submitting } = useSendTransaction();
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
   const [showConnectors, setShowConnectors] = useState(false);
@@ -307,10 +327,24 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
     setSubmittedTxHash(null);
     persistedHashRef.current = null;
 
-    // 1. Pre-flight simulate so we can give a clear message for the
-    //    most common failure (insufficient testnet USDC) without
-    //    burning a real transaction. This is a contract dry-run via
-    //    eth_call, not a balance read.
+    // 1. Build the canonical USDC transfer calldata once. We use it
+    //    both for the pre-flight simulation (which expects a strictly
+    //    abi-encoded call) and as the base for the suffixed calldata
+    //    that actually gets submitted.
+    const transferData = encodeFunctionData({
+      abi: USDC_TRANSFER_ABI,
+      functionName: "transfer",
+      args: [payment.recipient, toUsdcUnits(payment.amountUsdc)],
+    });
+    const transferDataWithSuffix = appendBuilderCodeSuffix(transferData);
+
+    // 2. Pre-flight simulate so we can give a clear message for the
+    //    most common failure (insufficient USDC) without burning a
+    //    real transaction. Simulating the clean transfer is sufficient
+    //    here — the trailing suffix bytes are ignored by USDC, so a
+    //    successful clean simulation implies the suffixed transaction
+    //    will also succeed for the same balance/allowance reasons.
+    //    This is a contract dry-run via eth_call, not a balance read.
     if (publicClient && address) {
       try {
         await publicClient.simulateContract({
@@ -339,14 +373,14 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
       }
     }
 
-    // 2. Submit the real transaction.
+    // 3. Submit the real transaction using the suffixed calldata.
+    //    `useSendTransaction` ships our exact `data` bytes; using
+    //    `useWriteContract` here would re-encode and strip the suffix.
     let hash: `0x${string}`;
     try {
-      hash = await writeContractAsync({
-        abi: USDC_TRANSFER_ABI,
-        address: USDC_ADDRESS_BASE,
-        functionName: "transfer",
-        args: [payment.recipient, toUsdcUnits(payment.amountUsdc)],
+      hash = await sendTransactionAsync({
+        to: USDC_ADDRESS_BASE,
+        data: transferDataWithSuffix,
         chainId: CHAIN_ID,
       });
     } catch (err) {
@@ -354,7 +388,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
       return;
     }
 
-    // 3. Optimistic write: record the hash + processing state. The
+    // 4. Optimistic write: record the hash + processing state. The
     //    receipt-handling effect above takes over from here and will
     //    flip the record to `completed` or `failed` once the wait
     //    resolves (or errors).
