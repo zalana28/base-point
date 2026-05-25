@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BasePointLogo } from "./BasePointLogo";
 import { NetworkBadge } from "./NetworkBadge";
 
 /**
@@ -12,16 +13,10 @@ export function Header() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link
           href="/"
-          className="group flex items-center gap-2.5 font-semibold tracking-tight text-slate-100"
+          className="group flex items-center"
+          aria-label="Base Point — home"
         >
-          <span
-            aria-hidden="true"
-            className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 via-indigo-500 to-cyan-400 shadow-[0_0_20px_-6px_rgba(33,81,245,0.7)] transition-transform duration-300 group-hover:scale-105"
-          >
-            <span className="absolute inset-0 rounded-lg bg-gradient-to-br from-white/30 via-transparent to-transparent" />
-            <span className="relative text-sm font-bold text-white">B</span>
-          </span>
-          <span className="text-base">Base Point</span>
+          <BasePointLogo size="sm" showWordmark />
         </Link>
 
         <nav className="flex items-center gap-1 sm:gap-2">
