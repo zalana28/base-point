@@ -10,6 +10,10 @@ import { PayWithBaseButton } from "@/components/PayWithBaseButton";
 import { PayWithWalletButton } from "@/components/PayWithWalletButton";
 import { Receipt } from "@/components/Receipt";
 import { SuccessAnimation } from "@/components/SuccessAnimation";
+import {
+  canRecoverPayment,
+  recoverPaymentStatus,
+} from "@/lib/paymentRecovery";
 import { getPaymentStore } from "@/stores/paymentStore";
 import type { PaymentRequest } from "@/types/payment";
 
@@ -39,6 +43,31 @@ export default function PayPage() {
   const handlePaymentUpdate = useCallback((updated: PaymentRequest) => {
     setState({ phase: "loaded", payment: updated });
   }, []);
+
+  // ----- Recovery state -----
+  const [recovering, setRecovering] = useState(false);
+
+  const handleCheckAgain = useCallback(async () => {
+    if (state.phase !== "loaded") return;
+    const payment = state.payment;
+    if (!canRecoverPayment(payment)) return;
+
+    setRecovering(true);
+    try {
+      const recovered = await recoverPaymentStatus(payment);
+      if (recovered.status !== payment.status) {
+        // Persist the terminal status
+        const persisted = await getPaymentStore().update(payment.id, {
+          status: recovered.status,
+          settledAt: recovered.settledAt,
+          errorMessage: recovered.errorMessage,
+        });
+        setState({ phase: "loaded", payment: persisted });
+      }
+    } finally {
+      setRecovering(false);
+    }
+  }, [state]);
 
   const isSuccess =
     state.phase === "loaded" &&
@@ -107,6 +136,39 @@ export default function PayPage() {
               <div className="bp-no-print">
                 <PaymentQrCard payment={state.payment} />
               </div>
+
+              {/* Recovery banner for stuck processing payments */}
+              {state.payment.status === "processing" &&
+                canRecoverPayment(state.payment) && (
+                  <div className="bp-no-print rounded-xl border border-blue-400/20 bg-blue-500/5 px-4 py-4 sm:px-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-sm font-medium text-blue-200">
+                          Still waiting for confirmation.
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Base Point only checks payment IDs it already
+                          created. It does not scan wallet history.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCheckAgain}
+                        disabled={recovering}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-200 transition-colors hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {recovering ? (
+                          <>
+                            <SmallSpinner />
+                            Checking&hellip;
+                          </>
+                        ) : (
+                          "Check again"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
               <div className="bp-no-print relative space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-6">
                 <div
@@ -221,5 +283,32 @@ function MissingState() {
         Create a new payment
       </Link>
     </div>
+  );
+}
+
+
+function SmallSpinner() {
+  return (
+    <svg
+      className="h-4 w-4 animate-spin"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="3"
+        className="opacity-20"
+      />
+      <path
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
