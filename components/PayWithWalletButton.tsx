@@ -14,19 +14,36 @@
  * on the same page; whichever one the customer clicks "wins" and tags
  * the record via `paidVia` so the Receipt labels the id correctly.
  *
+ * Failure handling (post-T6 fix):
+ *  - Before submitting, we run `publicClient.simulateContract(...)`
+ *    against the connected wallet's address. If the simulation reverts
+ *    with "transfer amount exceeds balance" we surface a friendly
+ *    "get testnet USDC" message and DO NOT submit anything.
+ *  - If the transaction is submitted but the receipt comes back with
+ *    `status: "reverted"`, we persist `status: "failed"` with a clear
+ *    error message so the page never sticks on "Confirming…".
+ *  - If `useWaitForTransactionReceipt` errors out (RPC error, timeout),
+ *    we treat that as a failure too — same persisted message — rather
+ *    than leaving the record in `processing` indefinitely.
+ *  - In every failure branch we keep `paymentId` intact so the
+ *    Receipt can still show the customer the transaction hash.
+ *
  * Constraints honoured here (do not relax):
  *  - No `@base-org/account` import. That SDK lives in lib/basePay.ts.
  *  - No `testnet:` literal — wagmi is pinned to Base Sepolia inside
  *    lib/wagmi.ts.
  *  - No direct `localStorage` access. Goes through `getPaymentStore()`.
  *  - No balance reads. No transaction-history reads. No block-explorer
- *    or third-party indexer APIs.
+ *    or third-party indexer APIs. (Pre-flight `simulateContract` is a
+ *    transaction dry-run, not a balance read — it asks the chain
+ *    "would this transfer succeed?" without enumerating the wallet.)
  */
 
 import { useEffect, useRef, useState } from "react";
 import {
   useAccount,
   useConnect,
+  usePublicClient,
   useSwitchChain,
   useWaitForTransactionReceipt,
   useWriteContract,
@@ -52,7 +69,42 @@ interface Props {
   onUpdate: (updated: PaymentRequest) => void;
 }
 
-function describeError(err: unknown, fallback: string): string {
+/** Shared revert / wait-error message, per spec. */
+const FAILURE_MESSAGE =
+  "Wallet payment failed. Your wallet may not have enough Base Sepolia USDC.";
+
+/**
+ * Detect "transfer amount exceeds balance" in any of the shapes viem
+ * can throw it (top-level message, `shortMessage`, `details`, or a
+ * nested `cause`). Returns true when the simulation result clearly
+ * means "your USDC balance is too low".
+ */
+function isInsufficientBalanceError(err: unknown): boolean {
+  const visited = new Set<unknown>();
+  const probe = /transfer amount exceeds balance/i;
+
+  function walk(node: unknown): boolean {
+    if (!node || typeof node !== "object" || visited.has(node)) return false;
+    visited.add(node);
+
+    const candidate = node as {
+      message?: unknown;
+      shortMessage?: unknown;
+      details?: unknown;
+      cause?: unknown;
+    };
+    for (const key of ["message", "shortMessage", "details"] as const) {
+      const v = candidate[key];
+      if (typeof v === "string" && probe.test(v)) return true;
+    }
+    if (candidate.cause) return walk(candidate.cause);
+    return false;
+  }
+
+  return walk(err);
+}
+
+function describeWriteError(err: unknown, fallback: string): string {
   if (err instanceof Error) {
     if (/reject|denied|user/i.test(err.message)) {
       return "Request was rejected.";
@@ -76,6 +128,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
     error: switchError,
   } = useSwitchChain();
   const { writeContractAsync, isPending: submitting } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: CHAIN_ID });
 
   const [showConnectors, setShowConnectors] = useState(false);
   const [submittedTxHash, setSubmittedTxHash] = useState<
@@ -84,8 +137,11 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
   const [localError, setLocalError] = useState<string | null>(null);
 
   // The receipt query is automatically polled by wagmi via react-query
-  // until the transaction is included on-chain.
-  const { data: receipt } = useWaitForTransactionReceipt({
+  // until the transaction is included on-chain. We watch BOTH the
+  // delivered receipt (which can be `success` or `reverted`) and any
+  // hard error from the wait itself, so the UI never sticks at
+  // "Confirming…" if something goes wrong.
+  const { data: receipt, error: receiptError } = useWaitForTransactionReceipt({
     hash: submittedTxHash ?? undefined,
     chainId: CHAIN_ID,
   });
@@ -94,24 +150,35 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
   const persistedHashRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!receipt || !submittedTxHash) return;
+    if (!submittedTxHash) return;
     if (persistedHashRef.current === submittedTxHash) return;
+
+    // Resolved: receipt arrived (success or reverted).
+    // Errored:  the wait itself threw before a receipt could be
+    //           delivered (RPC outage, timeout, etc.).
+    // Either way, we mark this submitted hash as "handled" so we
+    // don't double-write.
+    if (!receipt && !receiptError) return;
     persistedHashRef.current = submittedTxHash;
 
     let cancelled = false;
     (async () => {
       try {
-        if (receipt.status === "success") {
+        if (receipt && receipt.status === "success") {
           const updated = await getPaymentStore().update(payment.id, {
             status: "completed",
             settledAt: Date.now(),
           });
           if (!cancelled) onUpdate(updated);
         } else {
+          // Either receipt.status === "reverted" or the wait itself
+          // errored. Persist the same user-friendly failure message
+          // either way; the existing `paymentId` is left intact so
+          // the Receipt still surfaces the transaction hash.
           const updated = await getPaymentStore().update(payment.id, {
             status: "failed",
             settledAt: Date.now(),
-            errorMessage: "Transaction reverted on-chain.",
+            errorMessage: FAILURE_MESSAGE,
           });
           if (!cancelled) onUpdate(updated);
         }
@@ -123,7 +190,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [receipt, submittedTxHash, payment.id, onUpdate]);
+  }, [receipt, receiptError, submittedTxHash, payment.id, onUpdate]);
 
   // Hide entirely once the request is settled — the Receipt below
   // already shows the terminal state.
@@ -222,7 +289,7 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
   // Render: connected on Base Sepolia, ready to pay
   // -----------------------------------------------------------------
   const waitingForReceipt =
-    submittedTxHash !== null && (!receipt || receipt.status === undefined);
+    submittedTxHash !== null && !receipt && !receiptError;
   const inFlight = submitting || waitingForReceipt;
   const processing = payment.status === "processing";
 
@@ -240,16 +307,59 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
     setSubmittedTxHash(null);
     persistedHashRef.current = null;
 
+    // 1. Pre-flight simulate so we can give a clear message for the
+    //    most common failure (insufficient testnet USDC) without
+    //    burning a real transaction. This is a contract dry-run via
+    //    eth_call, not a balance read.
+    if (publicClient && address) {
+      try {
+        await publicClient.simulateContract({
+          abi: USDC_TRANSFER_ABI,
+          address: USDC_ADDRESS_BASE_SEPOLIA,
+          functionName: "transfer",
+          args: [payment.recipient, toUsdcUnits(payment.amountUsdc)],
+          account: address,
+        });
+      } catch (err) {
+        if (isInsufficientBalanceError(err)) {
+          setLocalError(
+            "Insufficient Base Sepolia USDC. Get testnet USDC and try again.",
+          );
+        } else if (
+          err instanceof Error &&
+          /reject|denied|user/i.test(err.message)
+        ) {
+          setLocalError("Request was rejected.");
+        } else {
+          setLocalError(
+            "Could not pre-check the transaction. Please try again.",
+          );
+        }
+        return;
+      }
+    }
+
+    // 2. Submit the real transaction.
+    let hash: `0x${string}`;
     try {
-      const hash = await writeContractAsync({
+      hash = await writeContractAsync({
         abi: USDC_TRANSFER_ABI,
         address: USDC_ADDRESS_BASE_SEPOLIA,
         functionName: "transfer",
         args: [payment.recipient, toUsdcUnits(payment.amountUsdc)],
         chainId: CHAIN_ID,
       });
-      setSubmittedTxHash(hash);
+    } catch (err) {
+      setLocalError(describeWriteError(err, "Could not send the transaction."));
+      return;
+    }
 
+    // 3. Optimistic write: record the hash + processing state. The
+    //    receipt-handling effect above takes over from here and will
+    //    flip the record to `completed` or `failed` once the wait
+    //    resolves (or errors).
+    setSubmittedTxHash(hash);
+    try {
       const updated = await getPaymentStore().update(payment.id, {
         paymentId: hash,
         paidVia: "wallet",
@@ -259,7 +369,11 @@ export function PayWithWalletButton({ payment, onUpdate }: Props) {
       });
       onUpdate(updated);
     } catch (err) {
-      setLocalError(describeError(err, "Could not send the transaction."));
+      setLocalError(
+        err instanceof Error
+          ? err.message
+          : "Could not record the payment locally.",
+      );
     }
   }
 
