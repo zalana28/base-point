@@ -7,18 +7,25 @@
  * filterable payment list with actions (open checkout, open receipt,
  * copy links), and contextual empty/loading states.
  *
+ * Includes payment-status recovery: merchants can re-check "processing"
+ * payments that have a known paymentId/tx hash without adding any
+ * external indexer, balance reads, or transaction-history scans.
+ *
  * Client Component because it reads from `localStorage` via the
- * payment store. No Base Pay calls, no @base-org/account import, no
- * localStorage access outside the store, no balance/history reads, no
- * block-explorer or third-party indexer.
+ * payment store. No @base-org/account import, no localStorage access
+ * outside the store, no block-explorer or third-party indexer.
  */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CopyButton } from "@/components/CopyButton";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { formatAmount, formatDate, truncateAddress } from "@/lib/format";
+import {
+  canRecoverPayment,
+  recoverPaymentStatus,
+} from "@/lib/paymentRecovery";
 import { getPaymentStore } from "@/stores/paymentStore";
 import type { PaymentRequest, PaymentRequestStatus } from "@/types/payment";
 
@@ -32,6 +39,11 @@ export default function DashboardPage() {
   const [payments, setPayments] = useState<PaymentRequest[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Recovery state
+  const [recoveringIds, setRecoveringIds] = useState<Set<string>>(new Set());
+  const [bulkRecovering, setBulkRecovering] = useState(false);
+  const [lastChecked, setLastChecked] = useState<number | null>(null);
 
   // Load payments on mount (client-only)
   useEffect(() => {
@@ -86,6 +98,80 @@ export default function DashboardPage() {
 
     return list;
   }, [payments, statusFilter, searchQuery]);
+
+  // ----- Single payment recovery -----
+  const handleRecoverOne = useCallback(
+    async (payment: PaymentRequest) => {
+      if (!canRecoverPayment(payment)) return;
+
+      setRecoveringIds((prev) => new Set(prev).add(payment.id));
+      try {
+        const recovered = await recoverPaymentStatus(payment);
+        if (recovered.status !== payment.status) {
+          const persisted = await getPaymentStore().update(payment.id, {
+            status: recovered.status,
+            settledAt: recovered.settledAt,
+            errorMessage: recovered.errorMessage,
+          });
+          setPayments((prev) =>
+            prev
+              ? prev.map((p) => (p.id === persisted.id ? persisted : p))
+              : prev,
+          );
+        }
+      } finally {
+        setRecoveringIds((prev) => {
+          const next = new Set(prev);
+          next.delete(payment.id);
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
+  // ----- Bulk recovery of all processing payments -----
+  const handleRefreshAll = useCallback(async () => {
+    if (!payments) return;
+    const processing = payments.filter(canRecoverPayment);
+    if (processing.length === 0) return;
+
+    setBulkRecovering(true);
+    const updates: PaymentRequest[] = [];
+
+    for (const payment of processing) {
+      try {
+        const recovered = await recoverPaymentStatus(payment);
+        if (recovered.status !== payment.status) {
+          const persisted = await getPaymentStore().update(payment.id, {
+            status: recovered.status,
+            settledAt: recovered.settledAt,
+            errorMessage: recovered.errorMessage,
+          });
+          updates.push(persisted);
+        }
+      } catch {
+        // Don't block the whole batch if one fails.
+      }
+    }
+
+    if (updates.length > 0) {
+      setPayments((prev) => {
+        if (!prev) return prev;
+        const updateMap = new Map(updates.map((u) => [u.id, u]));
+        return prev.map((p) => updateMap.get(p.id) ?? p);
+      });
+    }
+
+    setLastChecked(Date.now());
+    setBulkRecovering(false);
+  }, [payments]);
+
+  // Count of recoverable processing payments
+  const recoverableCount = useMemo(
+    () => (payments ? payments.filter(canRecoverPayment).length : 0),
+    [payments],
+  );
 
   // ---------- Loading state ---------------------------------------------------
 
@@ -171,8 +257,50 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Bulk recovery bar */}
+        {recoverableCount > 0 && (
+          <div className="mt-6 flex flex-col gap-3 rounded-xl border border-blue-400/20 bg-blue-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm font-medium text-blue-200">
+                {recoverableCount} processing{" "}
+                {recoverableCount === 1 ? "payment" : "payments"} with
+                known IDs
+              </p>
+              <p className="text-xs text-slate-400">
+                Base Point only checks payment IDs it already created. It
+                does not scan wallet history.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {lastChecked && (
+                <span className="text-[11px] text-slate-500">
+                  Last checked {formatDate(lastChecked)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleRefreshAll}
+                disabled={bulkRecovering}
+                className="inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-200 transition-colors hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {bulkRecovering ? (
+                  <>
+                    <SmallSpinner />
+                    Checking&hellip;
+                  </>
+                ) : (
+                  <>
+                    <RefreshIcon />
+                    Refresh processing payments
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-wrap gap-1.5">
             {(
               ["all", "pending", "processing", "completed", "failed"] as const
@@ -208,7 +336,12 @@ export default function DashboardPage() {
             </div>
           ) : (
             filteredPayments.map((payment) => (
-              <PaymentCard key={payment.id} payment={payment} />
+              <PaymentCard
+                key={payment.id}
+                payment={payment}
+                recovering={recoveringIds.has(payment.id)}
+                onRecover={handleRecoverOne}
+              />
             ))
           )}
         </div>
@@ -265,7 +398,15 @@ function StatCard({
   );
 }
 
-function PaymentCard({ payment }: { payment: PaymentRequest }) {
+function PaymentCard({
+  payment,
+  recovering,
+  onRecover,
+}: {
+  payment: PaymentRequest;
+  recovering: boolean;
+  onRecover: (payment: PaymentRequest) => void;
+}) {
   const checkoutUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/pay/${payment.id}`
@@ -355,6 +496,24 @@ function PaymentCard({ payment }: { payment: PaymentRequest }) {
             )}
           </>
         )}
+        {/* Recovery action for processing payments */}
+        {canRecoverPayment(payment) && (
+          <button
+            type="button"
+            onClick={() => onRecover(payment)}
+            disabled={recovering}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-200 transition-colors hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {recovering ? (
+              <>
+                <SmallSpinner />
+                Checking&hellip;
+              </>
+            ) : (
+              "Check status"
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -393,6 +552,32 @@ function LoadingSpinner() {
   return (
     <svg
       className="h-6 w-6 animate-spin text-slate-400"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="3"
+        className="opacity-20"
+      />
+      <path
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SmallSpinner() {
+  return (
+    <svg
+      className="h-3.5 w-3.5 animate-spin"
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden="true"
@@ -471,6 +656,24 @@ function PlusIcon() {
       aria-hidden="true"
     >
       <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5"
+      aria-hidden="true"
+    >
+      <path d="M1.5 8a6.5 6.5 0 0 1 11.3-4.4M14.5 8a6.5 6.5 0 0 1-11.3 4.4" />
+      <path d="M12.8 1v2.6h-2.6M3.2 15v-2.6h2.6" />
     </svg>
   );
 }
