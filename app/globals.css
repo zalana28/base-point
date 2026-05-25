@@ -79,3 +79,47 @@ textarea:-webkit-autofill {
 :focus-visible {
   outline: none;
 }
+
+/*
+ * Print styles.
+ *
+ * Receipts printed from /pay/[id] or /receipt/[id] should look like a
+ * clean, monochrome paper receipt: dark theme is for the screen, paper
+ * gets black ink on white. Anything tagged `bp-no-print` is hidden;
+ * the receipt container (`bp-receipt-print`) is forced to a flat,
+ * border-only treatment that translates well to inked paper.
+ */
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Hide app chrome (header, footer, action rows, page glows). */
+  header,
+  footer,
+  .bp-no-print,
+  .bp-aurora,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Force flat colours / no shadows on the receipt itself. */
+  .bp-receipt-print {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .bp-receipt-print *,
+  .bp-receipt-print *::before,
+  .bp-receipt-print *::after {
+    color: inherit !important;
+    background: transparent !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+}
