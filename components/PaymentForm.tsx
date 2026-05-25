@@ -7,6 +7,16 @@
  * and call the (browser-side) `PaymentStore`. Renders nothing async at
  * import time, so it is safe to be referenced from a Server Component.
  *
+ * Itemised flow
+ * -------------
+ * The form is itemised by default: merchant + item + quantity +
+ * unit price -> `amountUsdc = quantity * unitPriceUsdc`. Quantity is
+ * a positive integer in the MVP, which keeps the total math float-free
+ * (we use viem's `parseUnits` / `formatUnits` for the multiplication).
+ *
+ * The single-line "donation" case is still natural: set quantity to 1
+ * and unit price to the donation amount.
+ *
  * Constraints honoured here (do not relax):
  *  - No Base Pay calls. Base Pay is invoked by the public payment page,
  *    not from `/create`.
@@ -22,19 +32,32 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { formatUnits, parseUnits } from "viem";
 
+import { formatAmount } from "@/lib/format";
 import {
+  CUSTOMER_LABEL_MAX_LENGTH,
+  ITEM_NAME_MAX_LENGTH,
+  MERCHANT_NAME_MAX_LENGTH,
   NOTE_MAX_LENGTH,
   validateAddress,
   validateAmount,
+  validateCustomerLabel,
+  validateItemName,
+  validateMerchantName,
   validateNote,
+  validateQuantity,
 } from "@/lib/validators";
 import { getPaymentStore } from "@/stores/paymentStore";
 
 interface FieldErrors {
+  merchantName?: string;
   recipient?: string;
-  amount?: string;
+  itemName?: string;
+  quantity?: string;
+  unitPrice?: string;
+  customerLabel?: string;
   note?: string;
   /** Top-level error (e.g. storage failure) not tied to a single field. */
   form?: string;
@@ -43,30 +66,91 @@ interface FieldErrors {
 const INPUT_BASE =
   "block w-full rounded-xl border border-white/10 bg-slate-950/40 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 shadow-inner shadow-black/20 transition focus:border-blue-400/50 focus:bg-slate-950/70 focus:outline-none focus:ring-2 focus:ring-blue-500/30";
 
+/**
+ * Compute the total `amountUsdc` from a (possibly invalid) unit price
+ * and quantity, returning `null` if either is currently empty / not a
+ * valid USDC decimal / not a valid positive integer. We use viem so
+ * the multiplication is integer-domain bigint math, never `Number`.
+ */
+function computeTotal(unitPrice: string, quantity: string): string | null {
+  const trimmedPrice = unitPrice.trim();
+  const trimmedQty = quantity.trim();
+  if (!trimmedPrice || !trimmedQty) return null;
+  if (!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(trimmedPrice)) return null;
+  if (!/^[1-9]\d*$/.test(trimmedQty)) return null;
+  try {
+    const totalUnits = parseUnits(trimmedPrice, 6) * BigInt(trimmedQty);
+    return formatUnits(totalUnits, 6);
+  } catch {
+    return null;
+  }
+}
+
 export function PaymentForm() {
   const router = useRouter();
 
+  const [merchantName, setMerchantName] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [amount, setAmount] = useState("");
+  const [itemName, setItemName] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [customerLabel, setCustomerLabel] = useState("");
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  const total = useMemo(
+    () => computeTotal(unitPrice, quantity),
+    [unitPrice, quantity],
+  );
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
 
+    const m = validateMerchantName(merchantName);
     const r = validateAddress(recipient);
-    const a = validateAmount(amount);
+    const it = validateItemName(itemName);
+    const q = validateQuantity(quantity);
+    const up = validateAmount(unitPrice);
+    const cl = validateCustomerLabel(customerLabel);
     const n = validateNote(note);
 
     const nextErrors: FieldErrors = {};
+    if (!m.ok) nextErrors.merchantName = m.message;
     if (!r.ok) nextErrors.recipient = r.message;
-    if (!a.ok) nextErrors.amount = a.message;
+    if (!it.ok) nextErrors.itemName = it.message;
+    if (!q.ok) nextErrors.quantity = q.message;
+    if (!up.ok) nextErrors.unitPrice = up.message;
+    if (!cl.ok) nextErrors.customerLabel = cl.message;
     if (!n.ok) nextErrors.note = n.message;
 
-    if (!r.ok || !a.ok || !n.ok) {
+    if (
+      !m.ok ||
+      !r.ok ||
+      !it.ok ||
+      !q.ok ||
+      !up.ok ||
+      !cl.ok ||
+      !n.ok
+    ) {
       setErrors(nextErrors);
+      return;
+    }
+
+    // Compute the final total once all fields are validated. If for any
+    // reason the integer-bigint math fails (it shouldn't here), surface
+    // a form-level error rather than silently submitting a wrong total.
+    const totalAmount = computeTotal(up.value, String(q.value));
+    if (totalAmount === null) {
+      setErrors({
+        form: "Could not compute the total. Check the quantity and unit price.",
+      });
+      return;
+    }
+    const totalChecked = validateAmount(totalAmount);
+    if (!totalChecked.ok) {
+      setErrors({ form: totalChecked.message });
       return;
     }
 
@@ -75,8 +159,13 @@ export function PaymentForm() {
     try {
       const record = await getPaymentStore().create({
         recipient: r.value,
-        amountUsdc: a.value,
+        amountUsdc: totalChecked.value,
         note: n.value,
+        merchantName: m.value,
+        itemName: it.value,
+        quantity: q.value,
+        unitPriceUsdc: up.value,
+        customerLabel: cl.value,
       });
       router.push(`/pay/${record.id}`);
       // Intentionally do NOT clear `submitting` on success — we are
@@ -94,6 +183,40 @@ export function PaymentForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
+      {/* Merchant name -------------------------------------------------- */}
+      <div>
+        <label
+          htmlFor="merchantName"
+          className="block text-sm font-medium text-slate-200"
+        >
+          Merchant name
+        </label>
+        <input
+          id="merchantName"
+          name="merchantName"
+          type="text"
+          autoComplete="organization"
+          maxLength={MERCHANT_NAME_MAX_LENGTH}
+          placeholder="Acme Coffee"
+          value={merchantName}
+          onChange={(event) => setMerchantName(event.target.value)}
+          aria-invalid={errors.merchantName ? "true" : undefined}
+          aria-describedby={
+            errors.merchantName ? "merchantName-error" : "merchantName-hint"
+          }
+          className={`mt-1.5 ${INPUT_BASE}`}
+        />
+        {errors.merchantName ? (
+          <p id="merchantName-error" className="mt-1.5 text-sm text-rose-400">
+            {errors.merchantName}
+          </p>
+        ) : (
+          <p id="merchantName-hint" className="mt-1.5 text-xs text-slate-500">
+            Shown on the customer&rsquo;s receipt.
+          </p>
+        )}
+      </div>
+
       {/* Recipient ------------------------------------------------------ */}
       <div>
         <label
@@ -128,35 +251,146 @@ export function PaymentForm() {
         )}
       </div>
 
-      {/* Amount --------------------------------------------------------- */}
+      {/* Item ----------------------------------------------------------- */}
       <div>
         <label
-          htmlFor="amount"
+          htmlFor="itemName"
           className="block text-sm font-medium text-slate-200"
         >
-          Amount (USDC)
+          Item or service
         </label>
         <input
-          id="amount"
-          name="amount"
+          id="itemName"
+          name="itemName"
           type="text"
-          inputMode="decimal"
           autoComplete="off"
-          placeholder="0.00"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          aria-invalid={errors.amount ? "true" : undefined}
-          aria-describedby={errors.amount ? "amount-error" : "amount-hint"}
+          maxLength={ITEM_NAME_MAX_LENGTH}
+          placeholder="Latte"
+          value={itemName}
+          onChange={(event) => setItemName(event.target.value)}
+          aria-invalid={errors.itemName ? "true" : undefined}
+          aria-describedby={
+            errors.itemName ? "itemName-error" : "itemName-hint"
+          }
           className={`mt-1.5 ${INPUT_BASE}`}
         />
-        {errors.amount ? (
-          <p id="amount-error" className="mt-1.5 text-sm text-rose-400">
-            {errors.amount}
+        {errors.itemName ? (
+          <p id="itemName-error" className="mt-1.5 text-sm text-rose-400">
+            {errors.itemName}
           </p>
         ) : (
-          <p id="amount-hint" className="mt-1.5 text-xs text-slate-500">
-            Up to 6 decimal places, e.g.{" "}
-            <span className="font-mono text-slate-400">10.50</span>.
+          <p id="itemName-hint" className="mt-1.5 text-xs text-slate-500">
+            What the customer is paying for. Appears on the receipt.
+          </p>
+        )}
+      </div>
+
+      {/* Quantity + unit price + total --------------------------------- */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <label
+            htmlFor="quantity"
+            className="block text-sm font-medium text-slate-200"
+          >
+            Quantity
+          </label>
+          <input
+            id="quantity"
+            name="quantity"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="1"
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            aria-invalid={errors.quantity ? "true" : undefined}
+            aria-describedby={errors.quantity ? "quantity-error" : undefined}
+            className={`mt-1.5 ${INPUT_BASE}`}
+          />
+          {errors.quantity ? (
+            <p id="quantity-error" className="mt-1.5 text-sm text-rose-400">
+              {errors.quantity}
+            </p>
+          ) : null}
+        </div>
+
+        <div>
+          <label
+            htmlFor="unitPrice"
+            className="block text-sm font-medium text-slate-200"
+          >
+            Unit price (USDC)
+          </label>
+          <input
+            id="unitPrice"
+            name="unitPrice"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="0.00"
+            value={unitPrice}
+            onChange={(event) => setUnitPrice(event.target.value)}
+            aria-invalid={errors.unitPrice ? "true" : undefined}
+            aria-describedby={errors.unitPrice ? "unitPrice-error" : undefined}
+            className={`mt-1.5 ${INPUT_BASE}`}
+          />
+          {errors.unitPrice ? (
+            <p id="unitPrice-error" className="mt-1.5 text-sm text-rose-400">
+              {errors.unitPrice}
+            </p>
+          ) : null}
+        </div>
+
+        <div>
+          <span className="block text-sm font-medium text-slate-200">
+            Total
+          </span>
+          <output
+            htmlFor="quantity unitPrice"
+            className={`mt-1.5 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 text-sm text-slate-100 shadow-inner shadow-black/20 ${total ? "" : "text-slate-500"}`}
+          >
+            <span className="font-mono">
+              {total ? formatAmount(total) : "0.00"}
+            </span>
+            <span className="text-xs text-slate-400">USDC</span>
+          </output>
+        </div>
+      </div>
+
+      {/* Customer label ------------------------------------------------- */}
+      <div>
+        <label
+          htmlFor="customerLabel"
+          className="block text-sm font-medium text-slate-200"
+        >
+          Customer label{" "}
+          <span className="font-normal text-slate-500">(optional)</span>
+        </label>
+        <input
+          id="customerLabel"
+          name="customerLabel"
+          type="text"
+          autoComplete="off"
+          maxLength={CUSTOMER_LABEL_MAX_LENGTH}
+          placeholder="Table 5 · Order #1234"
+          value={customerLabel}
+          onChange={(event) => setCustomerLabel(event.target.value)}
+          aria-invalid={errors.customerLabel ? "true" : undefined}
+          aria-describedby={
+            errors.customerLabel ? "customerLabel-error" : "customerLabel-hint"
+          }
+          className={`mt-1.5 ${INPUT_BASE}`}
+        />
+        {errors.customerLabel ? (
+          <p
+            id="customerLabel-error"
+            className="mt-1.5 text-sm text-rose-400"
+          >
+            {errors.customerLabel}
+          </p>
+        ) : (
+          <p id="customerLabel-hint" className="mt-1.5 text-xs text-slate-500">
+            Shown to the customer on the receipt and checkout page.
           </p>
         )}
       </div>
@@ -168,7 +402,8 @@ export function PaymentForm() {
             htmlFor="note"
             className="block text-sm font-medium text-slate-200"
           >
-            Note <span className="font-normal text-slate-500">(optional)</span>
+            Internal note{" "}
+            <span className="font-normal text-slate-500">(optional)</span>
           </label>
           <span className="text-xs text-slate-500">
             {note.length} / {NOTE_MAX_LENGTH}
@@ -177,9 +412,9 @@ export function PaymentForm() {
         <textarea
           id="note"
           name="note"
-          rows={3}
+          rows={2}
           maxLength={NOTE_MAX_LENGTH}
-          placeholder="Order #1234"
+          placeholder="Private to you — not shown to the customer."
           value={note}
           onChange={(event) => setNote(event.target.value)}
           aria-invalid={errors.note ? "true" : undefined}

@@ -122,6 +122,13 @@ export default function HomePage() {
               <NetworkBadge />
               <span>Mainnet mode uses real USDC.</span>
             </div>
+
+            <div className="mt-2 max-w-xl rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] px-4 py-3 text-sm text-slate-300">
+              <span className="font-semibold text-white">
+                Wallet transfers move funds.
+              </span>{" "}
+              Base Point creates a payment record, receipt, and checkout flow.
+            </div>
           </div>
 
           {/* Hero mockup --------------------------------------------- */}

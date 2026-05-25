@@ -17,6 +17,29 @@ import type {
 
 import { localPaymentStore } from "./localPaymentStore";
 
+/**
+ * Fields that cannot be modified after a record is created. Identity
+ * (`id`, `createdAt`) and network metadata (`network`, `chainId`) have
+ * always been pinned. Receipt-side metadata (`receiptId`, line items,
+ * customer label) is also pinned at create time so the public receipt
+ * URL can never silently change out from under a customer.
+ */
+type ImmutablePaymentField =
+  | "id"
+  | "createdAt"
+  | "network"
+  | "chainId"
+  | "receiptId"
+  | "merchantName"
+  | "itemName"
+  | "quantity"
+  | "unitPriceUsdc"
+  | "customerLabel";
+
+export type PaymentPatch = Partial<
+  Omit<PaymentRequest, ImmutablePaymentField>
+>;
+
 export interface PaymentStore {
   /** Return every record, newest first. */
   list(): Promise<PaymentRequest[]>;
@@ -25,26 +48,28 @@ export interface PaymentStore {
   getById(id: string): Promise<PaymentRequest | null>;
 
   /**
-   * Persist a new record. The store fills in `id`, `status`, `createdAt`,
-   * `network`, and `chainId` itself so callers cannot tag a record with
-   * the wrong network.
+   * Return one record by its receipt id, or `null` if no record has
+   * that receipt id (or the record predates the receipt-id feature).
+   * Receipt id matching is case-insensitive.
+   */
+  getByReceiptId(receiptId: string): Promise<PaymentRequest | null>;
+
+  /**
+   * Persist a new record. The store fills in `id`, `receiptId`,
+   * `status`, `createdAt`, `network`, and `chainId` itself so callers
+   * cannot tag a record with the wrong network or spoof a receipt id.
    */
   create(input: CreatePaymentRequestInput): Promise<PaymentRequest>;
 
   /**
    * Apply a partial patch to an existing record.
    *
-   * Identity (`id`, `createdAt`) and network metadata (`network`,
-   * `chainId`) are pinned at creation time and cannot be patched — the
-   * type signature blocks them, and the implementation re-asserts the
-   * existing values defensively.
+   * Identity, network metadata, and receipt-side metadata are pinned
+   * at creation time and cannot be patched — the type signature blocks
+   * them, and the implementation re-asserts the existing values
+   * defensively. See `PaymentPatch`.
    */
-  update(
-    id: string,
-    patch: Partial<
-      Omit<PaymentRequest, "id" | "createdAt" | "network" | "chainId">
-    >,
-  ): Promise<PaymentRequest>;
+  update(id: string, patch: PaymentPatch): Promise<PaymentRequest>;
 
   /**
    * Delete every record. Intended for development / "reset" only.
