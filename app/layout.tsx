@@ -29,6 +29,8 @@ export const metadata: Metadata = {
    */
   other: {
     "base:app_id": BASE_APP_ID,
+    "talentapp:project_verification":
+      "8fa8d33a07afea41d3dc68dccbbde8f8212b29425445b0026d617758ef88632fe11c37b057181a7deb9f9d7f2ce4d548a415b51bdd975500fdf5eb6b6",
   },
 };
 
